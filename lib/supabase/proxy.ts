@@ -47,7 +47,7 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  if (
+  /*if (
     request.nextUrl.pathname !== "/" &&
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
@@ -57,7 +57,22 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
-  }
+  }*/
+
+    const publicPaths = [
+      "/",
+      "/sessions",
+    ]
+
+    const isPublicPath =
+      publicPaths.includes(request.nextUrl.pathname) ||
+      request.nextUrl.pathname.startsWith("/auth")
+
+    if (!user && !isPublicPath) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/auth/login"
+      return NextResponse.redirect(url)
+    }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:
