@@ -3,8 +3,6 @@ import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
 
-export const instant = false
-
 export default async function AppLayout({
     children,
 }: {

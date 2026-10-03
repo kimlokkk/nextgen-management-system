@@ -46,10 +46,13 @@ export function AppSidebar() {
                             Parents
                         </Link>
 
-                        <span className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground">
+                        <Link
+                            href="/students"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted"
+                        >
                             <UserRound className="size-4" />
                             Students
-                        </span>
+                        </Link>
 
                         <span className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground">
                             <CalendarDays className="size-4" />
