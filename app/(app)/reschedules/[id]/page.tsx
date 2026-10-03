@@ -126,7 +126,8 @@ export default async function RescheduleDetailPage({
         class_date,
         week_number,
         start_time,
-        end_time
+        end_time,
+        regular_capacity
       `)
             .eq(
                 "id",
@@ -239,11 +240,36 @@ export default async function RescheduleDetailPage({
 
     const today = getMalaysiaDate()
 
+    const { data: originalClassBookings } =
+        await supabase
+            .from("student_bookings")
+            .select(`
+            booking_type,
+            attendance_status
+        `)
+            .eq(
+                "class_session_id",
+                originalClass.id
+            )
+
+    const originalRegularOccupied =
+        originalClassBookings?.filter(
+            (booking) =>
+                countsTowardsRegularCapacity(
+                    booking
+                )
+        ).length ?? 0
+
+    const originalHasVacancy =
+        originalRegularOccupied <
+        originalClass.regular_capacity
+
     const canCancelReschedule =
         ["open", "scheduled"].includes(
             obligation.status
         ) &&
         originalClass.class_date >= today &&
+        originalHasVacancy &&
         (
             obligation.status === "open" ||
             (
@@ -544,6 +570,18 @@ export default async function RescheduleDetailPage({
                         The assigned reschedule class has already
                         passed. This reschedule can no longer be
                         cancelled automatically.
+                    </div>
+                )}
+
+            {["open", "scheduled"].includes(
+                obligation.status
+            ) &&
+                originalClass.class_date >= today &&
+                !originalHasVacancy && (
+                    <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
+                        The original regular seat is no longer available.
+                        Another student is currently using the vacancy,
+                        so this reschedule cannot be cancelled automatically.
                     </div>
                 )}
 

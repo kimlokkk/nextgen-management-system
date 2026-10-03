@@ -881,6 +881,7 @@ export async function cancelReschedule(
             id,
             schedule_batch_id,
             class_date,
+            regular_capacity,
             status
         `)
         .eq(
@@ -912,6 +913,50 @@ export async function cancelReschedule(
     ) {
         throw new Error(
             "A past reschedule cannot be cancelled back to the original class"
+        )
+    }
+
+    // =====================================================
+    // ORIGINAL CLASS CAPACITY
+    //
+    // Student's old seat may have been taken by
+    // another incoming reschedule while they were away.
+    // =====================================================
+
+    const {
+        data: originalClassBookings,
+        error: originalBookingsError,
+    } = await supabase
+        .from("student_bookings")
+        .select(`
+        booking_type,
+        attendance_status
+    `)
+        .eq(
+            "class_session_id",
+            originalClass.id
+        )
+
+    if (originalBookingsError) {
+        throw new Error(
+            originalBookingsError.message
+        )
+    }
+
+    const occupiedOriginalRegular =
+        originalClassBookings?.filter(
+            (booking) =>
+                countsTowardsRegularCapacity(
+                    booking
+                )
+        ).length ?? 0
+
+    if (
+        occupiedOriginalRegular >=
+        originalClass.regular_capacity
+    ) {
+        throw new Error(
+            "Original class no longer has a vacant regular seat"
         )
     }
 
