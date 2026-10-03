@@ -173,55 +173,124 @@ export async function markForReschedule(
     }
 
     /*
-     * Prevent duplicate obligation
-     */
+ * Existing obligation
+ *
+ * If previously cancelled, reuse it.
+ * Otherwise prevent duplicate active obligation.
+ */
 
-    const { data: existing } =
-        await supabase
-            .from("makeup_obligations")
-            .select("id, status")
-            .eq(
-                "source_booking_id",
-                booking.id
-            )
-            .maybeSingle()
+    const {
+        data: existing,
+        error: existingError,
+    } = await supabase
+        .from("makeup_obligations")
+        .select(`
+        id,
+        status,
+        obligation_type
+    `)
+        .eq(
+            "source_booking_id",
+            booking.id
+        )
+        .maybeSingle()
 
-    if (existing) {
+    if (existingError) {
         throw new Error(
-            "This booking already has a makeup obligation"
+            existingError.message
         )
     }
 
-    /*
-     * Create obligation first
-     */
+    let obligation: {
+        id: string
+    } | null = null
 
-    const {
-        data: obligation,
-        error: obligationError,
-    } = await supabase
-        .from("makeup_obligations")
-        .insert({
-            student_id: booking.student_id,
-            enrollment_id:
-                booking.enrollment_id,
-            source_booking_id:
-                booking.id,
-            obligation_type: "reschedule",
-            status: "open",
-            created_by: user.id,
-        })
-        .select("id")
-        .single()
+    let reusedCancelledObligation = false
 
-    if (
-        obligationError ||
-        !obligation
-    ) {
-        throw new Error(
-            obligationError?.message ??
-            "Unable to create reschedule obligation"
-        )
+    if (existing) {
+        if (
+            existing.obligation_type !==
+            "reschedule"
+        ) {
+            throw new Error(
+                "This booking already has another makeup obligation"
+            )
+        }
+
+        if (
+            existing.status !==
+            "cancelled"
+        ) {
+            throw new Error(
+                "This booking already has a makeup obligation"
+            )
+        }
+
+        const {
+            data: reopenedObligation,
+            error: reopenError,
+        } = await supabase
+            .from("makeup_obligations")
+            .update({
+                status: "open",
+                target_booking_id: null,
+                reason: null,
+                created_by: user.id,
+                updated_at:
+                    new Date().toISOString(),
+            })
+            .eq("id", existing.id)
+            .eq("status", "cancelled")
+            .select("id")
+            .maybeSingle()
+
+        if (
+            reopenError ||
+            !reopenedObligation
+        ) {
+            throw new Error(
+                reopenError?.message ??
+                "Unable to reopen cancelled reschedule"
+            )
+        }
+
+        obligation =
+            reopenedObligation
+
+        reusedCancelledObligation = true
+    } else {
+        const {
+            data: newObligation,
+            error: obligationError,
+        } = await supabase
+            .from("makeup_obligations")
+            .insert({
+                student_id:
+                    booking.student_id,
+                enrollment_id:
+                    booking.enrollment_id,
+                source_booking_id:
+                    booking.id,
+                obligation_type:
+                    "reschedule",
+                status: "open",
+                created_by: user.id,
+            })
+            .select("id")
+            .single()
+
+        if (
+            obligationError ||
+            !newObligation
+        ) {
+            throw new Error(
+                obligationError?.message ??
+                "Unable to create reschedule obligation"
+            )
+        }
+
+        obligation =
+            newObligation
     }
 
     /*
@@ -257,10 +326,29 @@ export async function markForReschedule(
         updateError ||
         !updatedBooking
     ) {
-        await supabase
-            .from("makeup_obligations")
-            .delete()
-            .eq("id", obligation.id)
+        if (obligation) {
+            if (reusedCancelledObligation) {
+                await supabase
+                    .from("makeup_obligations")
+                    .update({
+                        status: "cancelled",
+                        updated_at:
+                            new Date().toISOString(),
+                    })
+                    .eq(
+                        "id",
+                        obligation.id
+                    )
+            } else {
+                await supabase
+                    .from("makeup_obligations")
+                    .delete()
+                    .eq(
+                        "id",
+                        obligation.id
+                    )
+            }
+        }
 
         throw new Error(
             updateError?.message ??
