@@ -413,6 +413,10 @@ export default async function ScheduleSessionPage({
                                     const obligation =
                                         obligationMap.get(booking.id)
 
+                                    const hasActiveObligation =
+                                        obligation &&
+                                        obligation.status !== "cancelled"
+
                                     return (
                                         <tr
                                             key={booking.id}
@@ -442,7 +446,7 @@ export default async function ScheduleSessionPage({
                                             </td>
 
                                             <td className="px-6 py-4">
-                                                {obligation ? (
+                                                {hasActiveObligation ? (
                                                     <span className="text-sm font-medium capitalize">
                                                         {obligation.obligation_type}
                                                         {" · "}

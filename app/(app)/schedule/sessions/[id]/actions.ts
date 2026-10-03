@@ -9,6 +9,33 @@ const rescheduleSchema = z.object({
     session_id: z.string().uuid(),
 })
 
+function getMalaysiaDate() {
+    const parts =
+        new Intl.DateTimeFormat("en-US", {
+            timeZone: "Asia/Kuala_Lumpur",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).formatToParts(new Date())
+
+    const year =
+        parts.find(
+            (part) => part.type === "year"
+        )?.value ?? ""
+
+    const month =
+        parts.find(
+            (part) => part.type === "month"
+        )?.value ?? ""
+
+    const day =
+        parts.find(
+            (part) => part.type === "day"
+        )?.value ?? ""
+
+    return `${year}-${month}-${day}`
+}
+
 export async function markForReschedule(
     formData: FormData
 ) {
@@ -145,6 +172,15 @@ export async function markForReschedule(
     if (classSession.status !== "scheduled") {
         throw new Error(
             "Only scheduled classes can be rescheduled"
+        )
+    }
+
+    if (
+        classSession.class_date <
+        getMalaysiaDate()
+    ) {
+        throw new Error(
+            "Past classes cannot be rescheduled"
         )
     }
 
