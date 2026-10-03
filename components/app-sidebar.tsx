@@ -71,6 +71,14 @@ export function AppSidebar() {
                             <CreditCard className="size-4" />
                             Billing
                         </span>
+
+                        <Link
+                            href="/housekeeping/sessions"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted"
+                        >
+                            <Settings className="size-4" />
+                            Housekeeping
+                        </Link>
                     </div>
                 </div>
 
