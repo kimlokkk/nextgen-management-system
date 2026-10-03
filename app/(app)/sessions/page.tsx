@@ -7,24 +7,44 @@ export default async function SessionsPage() {
     .from("session_templates")
     .select(`
       id,
+      branch_id,
+      programme_id,
       name,
       start_time,
       end_time,
       regular_capacity,
-      replacement_capacity,
-      branches (
-        name
-      ),
-      programmes (
-        name
-      )
+      replacement_capacity
     `)
     .order("start_time")
+
+  const { data: branches } = await supabase
+    .from("branches")
+    .select("id, name")
+
+  const { data: programmes } = await supabase
+    .from("programmes")
+    .select("id, name")
+
+  const branchMap = new Map(
+    branches?.map((branch) => [
+      branch.id,
+      branch.name,
+    ]) ?? []
+  )
+
+  const programmeMap = new Map(
+    programmes?.map((programme) => [
+      programme.id,
+      programme.name,
+    ]) ?? []
+  )
 
   if (error) {
     return (
       <main className="p-8">
-        <h1 className="text-2xl font-bold">Sessions</h1>
+        <h1 className="text-2xl font-bold">
+          Sessions
+        </h1>
 
         <p className="mt-4 text-red-500">
           {error.message}
@@ -36,7 +56,6 @@ export default async function SessionsPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-5xl">
-
         <h1 className="text-3xl font-bold">
           Class Sessions
         </h1>
@@ -47,14 +66,23 @@ export default async function SessionsPage() {
 
         <div className="mt-8 overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-
             <thead className="border-b bg-muted/50">
               <tr>
-                <th className="p-4 text-left">Branch</th>
-                <th className="p-4 text-left">Programme</th>
-                <th className="p-4 text-left">Session</th>
-                <th className="p-4 text-left">Regular</th>
-                <th className="p-4 text-left">Replacement</th>
+                <th className="p-4 text-left">
+                  Branch
+                </th>
+                <th className="p-4 text-left">
+                  Programme
+                </th>
+                <th className="p-4 text-left">
+                  Session
+                </th>
+                <th className="p-4 text-left">
+                  Regular
+                </th>
+                <th className="p-4 text-left">
+                  Replacement
+                </th>
               </tr>
             </thead>
 
@@ -65,18 +93,28 @@ export default async function SessionsPage() {
                   className="border-b last:border-0"
                 >
                   <td className="p-4">
-                    {session.branches?.name}
+                    {branchMap.get(
+                      session.branch_id
+                    ) ?? "-"}
                   </td>
 
                   <td className="p-4">
-                    {session.programmes?.name}
+                    {programmeMap.get(
+                      session.programme_id
+                    ) ?? "-"}
                   </td>
 
                   <td className="p-4">
                     <div className="font-medium">
-                      {session.start_time.slice(0, 5)}
+                      {session.start_time.slice(
+                        0,
+                        5
+                      )}
                       {" - "}
-                      {session.end_time.slice(0, 5)}
+                      {session.end_time.slice(
+                        0,
+                        5
+                      )}
                     </div>
 
                     <div className="text-xs text-muted-foreground">
@@ -94,10 +132,8 @@ export default async function SessionsPage() {
                 </tr>
               ))}
             </tbody>
-
           </table>
         </div>
-
       </div>
     </main>
   )
