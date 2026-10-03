@@ -483,33 +483,117 @@ export default async function RescheduleDetailPage({
                 </div>
             </div>
 
-            {obligation.status === "scheduled" &&
-                !targetClass && (
-                    <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5">
-                        <p className="font-medium text-destructive">
-                            Assigned class could not be found.
-                        </p>
+            {/* ASSIGNED CLASS */}
 
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            This reschedule is marked as scheduled,
-                            but its target booking or class is missing.
-                        </p>
+            {obligation.status === "scheduled" && targetClass && (
+                <div className="rounded-xl border bg-background p-6">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 className="font-semibold">
+                                Assigned Class
+                            </h2>
+
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                New class selected for this reschedule.
+                            </p>
+                        </div>
+
+                        <span className="rounded-full border px-3 py-1 text-xs font-medium uppercase">
+                            Scheduled
+                        </span>
                     </div>
-                )}
 
-            {obligation.status === "scheduled" &&
-                !targetClass && (
-                    <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5">
-                        <p className="font-medium text-destructive">
-                            Assigned class could not be found.
-                        </p>
+                    <div className="mt-4 grid gap-4 md:grid-cols-4">
+                        <div>
+                            <p className="text-xs text-muted-foreground">
+                                Branch
+                            </p>
 
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            This reschedule is marked as scheduled,
-                            but its target booking or class is missing.
-                        </p>
+                            <p className="mt-1 font-medium">
+                                {branch?.name ?? "-"}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-muted-foreground">
+                                Programme
+                            </p>
+
+                            <p className="mt-1 font-medium">
+                                {programme?.name ?? "-"}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-muted-foreground">
+                                Date
+                            </p>
+
+                            <p className="mt-1 font-medium">
+                                {targetClass.class_date}
+                            </p>
+
+                            <p className="text-xs text-muted-foreground">
+                                W{targetClass.week_number}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-muted-foreground">
+                                Time
+                            </p>
+
+                            <p className="mt-1 font-medium">
+                                {targetClass.start_time.slice(0, 5)}
+                                {" - "}
+                                {targetClass.end_time.slice(0, 5)}
+                            </p>
+                        </div>
                     </div>
-                )}
+
+                    {targetBooking && (
+                        <div className="mt-5 border-t pt-4">
+                            <div className="flex flex-wrap gap-6 text-sm">
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Booking Type:
+                                    </span>{" "}
+                                    <span className="font-medium capitalize">
+                                        {targetBooking.booking_type}
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Attendance:
+                                    </span>{" "}
+                                    <span className="font-medium capitalize">
+                                        {targetBooking.attendance_status.replaceAll(
+                                            "_",
+                                            " "
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* DATA INTEGRITY WARNING */}
+
+            {obligation.status === "scheduled" && !targetClass && (
+                <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5">
+                    <p className="font-medium text-destructive">
+                        Assigned class could not be found.
+                    </p>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        This reschedule is marked as scheduled,
+                        but its target booking or class is missing.
+                    </p>
+                </div>
+            )}
 
             {/* CANDIDATES */}
 
