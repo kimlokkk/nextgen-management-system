@@ -1,5 +1,28 @@
 import { createClient } from "@/lib/supabase/server"
-import { generateSchedule } from "./actions"
+import {
+    approveSchedule,
+    generateSchedule,
+    lockSchedule,
+} from "./actions"
+
+import { getScheduleBatchValidation } from "@/lib/schedule-validation"
+import Link from "next/link"
+
+function formatMonth(value: string) {
+    const [year, month] = value
+        .split("-")
+        .map(Number)
+
+    return new Intl.DateTimeFormat("en-MY", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+    }).format(
+        new Date(
+            Date.UTC(year, month - 1, 1)
+        )
+    )
+}
 
 type SchedulePageProps = {
     searchParams: Promise<{
@@ -24,6 +47,32 @@ export default async function SchedulePage({
         .eq("is_active", true)
         .order("name")
 
+    const { data: existingSchedules } =
+        await supabase
+            .from("schedule_batches")
+            .select(`
+      id,
+      branch_id,
+      schedule_month,
+      status,
+      generated_at,
+      approved_at,
+      locked_at
+    `)
+            .order("schedule_month", {
+                ascending: false,
+            })
+            .order("created_at", {
+                ascending: false,
+            })
+
+    const branchMap = new Map(
+        branches?.map((branch) => [
+            branch.id,
+            branch.name,
+        ]) ?? []
+    )
+
     /*
      * Selected batch
      */
@@ -35,12 +84,14 @@ export default async function SchedulePage({
         const batchResult = await supabase
             .from("schedule_batches")
             .select(`
-        id,
-        branch_id,
-        schedule_month,
-        status,
-        generated_at
-      `)
+                id,
+                branch_id,
+                schedule_month,
+                status,
+                generated_at,
+                approved_at,
+                locked_at
+                `)
             .eq("id", params.batch)
             .single()
 
@@ -112,6 +163,15 @@ export default async function SchedulePage({
                 count + 1
             )
         }
+    }
+
+    let validation = null
+
+    if (batch) {
+        validation =
+            await getScheduleBatchValidation(
+                batch.id
+            )
     }
 
     return (
@@ -192,6 +252,110 @@ export default async function SchedulePage({
                 </form>
             </div>
 
+            {/* EXISTING SCHEDULES */}
+
+            <div className="space-y-4">
+                <div>
+                    <h2 className="text-xl font-semibold">
+                        Existing Schedules
+                    </h2>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        View previously generated monthly
+                        schedules.
+                    </p>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border bg-background">
+                    <table className="w-full text-sm">
+                        <thead className="bg-muted/50">
+                            <tr className="border-b">
+                                <th className="px-5 py-3 text-left">
+                                    Month
+                                </th>
+
+                                <th className="px-5 py-3 text-left">
+                                    Branch
+                                </th>
+
+                                <th className="px-5 py-3 text-left">
+                                    Status
+                                </th>
+
+                                <th className="px-5 py-3 text-left">
+                                    Generated
+                                </th>
+
+                                <th className="px-5 py-3 text-right">
+                                    Action
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {existingSchedules?.length ? (
+                                existingSchedules.map(
+                                    (schedule) => (
+                                        <tr
+                                            key={schedule.id}
+                                            className={`border-b last:border-0 ${params.batch ===
+                                                    schedule.id
+                                                    ? "bg-muted/30"
+                                                    : ""
+                                                }`}
+                                        >
+                                            <td className="px-5 py-4 font-medium">
+                                                {formatMonth(
+                                                    schedule.schedule_month
+                                                )}
+                                            </td>
+
+                                            <td className="px-5 py-4">
+                                                {branchMap.get(
+                                                    schedule.branch_id
+                                                ) ?? "-"}
+                                            </td>
+
+                                            <td className="px-5 py-4">
+                                                <span className="rounded-full border px-3 py-1 text-xs font-medium uppercase">
+                                                    {schedule.status}
+                                                </span>
+                                            </td>
+
+                                            <td className="px-5 py-4 text-muted-foreground">
+                                                {new Date(
+                                                    schedule.generated_at
+                                                ).toLocaleDateString(
+                                                    "en-MY"
+                                                )}
+                                            </td>
+
+                                            <td className="px-5 py-4 text-right">
+                                                <Link
+                                                    href={`/schedule?batch=${schedule.id}`}
+                                                    className="font-medium underline underline-offset-4"
+                                                >
+                                                    View
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    )
+                                )
+                            ) : (
+                                <tr>
+                                    <td
+                                        colSpan={5}
+                                        className="px-5 py-10 text-center text-muted-foreground"
+                                    >
+                                        No schedules generated yet.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {/* GENERATED RESULT */}
 
             {batch && (
@@ -211,6 +375,121 @@ export default async function SchedulePage({
                             {batch.status}
                         </span>
                     </div>
+
+                    {validation && (
+                        <div className="rounded-xl border bg-background p-6">
+                            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <h3 className="font-semibold">
+                                        Schedule Validation
+                                    </h3>
+
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        {validation.stats.sessions} classes
+                                        {" · "}
+                                        {validation.stats.bookings} student bookings
+                                    </p>
+
+                                    {validation.valid ? (
+                                        <p className="mt-3 text-sm font-medium">
+                                            ✓ No blocking conflicts detected.
+                                        </p>
+                                    ) : (
+                                        <div className="mt-3">
+                                            <p className="text-sm font-medium text-destructive">
+                                                Schedule has blocking conflicts.
+                                            </p>
+
+                                            <ul className="mt-2 space-y-1 text-sm text-destructive">
+                                                {validation.errors.map(
+                                                    (error) => (
+                                                        <li key={error}>
+                                                            • {error}
+                                                        </li>
+                                                    )
+                                                )}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="shrink-0">
+                                    {batch.status === "draft" && (
+                                        <form action={approveSchedule}>
+                                            <input
+                                                type="hidden"
+                                                name="batch_id"
+                                                value={batch.id}
+                                            />
+
+                                            <button
+                                                type="submit"
+                                                disabled={!validation.valid}
+                                                className="h-10 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                Approve Schedule
+                                            </button>
+                                        </form>
+                                    )}
+
+                                    {batch.status === "approved" && (
+                                        <div className="space-y-3 text-right">
+                                            <div>
+                                                <p className="text-sm font-medium">
+                                                    ✓ Schedule approved
+                                                </p>
+
+                                                {batch.approved_at && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {new Date(
+                                                            batch.approved_at
+                                                        ).toLocaleString("en-MY")}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <form action={lockSchedule}>
+                                                <input
+                                                    type="hidden"
+                                                    name="batch_id"
+                                                    value={batch.id}
+                                                />
+
+                                                <button
+                                                    type="submit"
+                                                    className="h-10 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground"
+                                                >
+                                                    Lock Schedule
+                                                </button>
+                                            </form>
+
+                                            <p className="max-w-xs text-xs text-muted-foreground">
+                                                Locking finalises the regular monthly
+                                                schedule. It cannot be regenerated after
+                                                this.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {batch.status === "locked" && (
+                                        <div className="text-right">
+                                            <p className="text-sm font-medium">
+                                                🔒 Schedule locked
+                                            </p>
+
+                                            {batch.locked_at && (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {new Date(
+                                                        batch.locked_at
+                                                    ).toLocaleString("en-MY")}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="overflow-hidden rounded-xl border bg-background">
                         <table className="w-full text-sm">
@@ -238,6 +517,10 @@ export default async function SchedulePage({
 
                                     <th className="px-5 py-3 text-left">
                                         Replacement
+                                    </th>
+
+                                    <th className="px-5 py-3 text-left">
+                                        Action
                                     </th>
                                 </tr>
                             </thead>
@@ -287,8 +570,8 @@ export default async function SchedulePage({
 
                                                 <td
                                                     className={`px-5 py-4 ${isOverCapacity
-                                                            ? "font-semibold text-destructive"
-                                                            : ""
+                                                        ? "font-semibold text-destructive"
+                                                        : ""
                                                         }`}
                                                 >
                                                     {regularCount}
@@ -307,6 +590,15 @@ export default async function SchedulePage({
                                                     {
                                                         session.replacement_capacity
                                                     }
+                                                </td>
+
+                                                <td className="px-5 py-4">
+                                                    <Link
+                                                        href={`/schedule/sessions/${session.id}`}
+                                                        className="font-medium underline underline-offset-4"
+                                                    >
+                                                        Review
+                                                    </Link>
                                                 </td>
                                             </tr>
                                         )

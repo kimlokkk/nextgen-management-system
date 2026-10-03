@@ -7,6 +7,7 @@ import {
 } from "@/lib/scheduling"
 import { redirect } from "next/navigation"
 import { z } from "zod"
+import { getScheduleBatchValidation } from "@/lib/schedule-validation"
 
 const generateSchema = z.object({
     branch_id: z.string().uuid(),
@@ -330,4 +331,218 @@ export async function generateSchedule(
     }
 
     redirect(`/schedule?batch=${batch.id}`)
+}
+
+export async function approveSchedule(
+    formData: FormData
+) {
+    const supabase = await createClient()
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+        throw new Error("Unauthorized")
+    }
+
+    /*
+     * Only Admin / Super Admin
+     */
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, is_active")
+        .eq("id", user.id)
+        .single()
+
+    if (
+        !profile ||
+        !profile.is_active ||
+        !["admin", "super_admin"].includes(
+            profile.role
+        )
+    ) {
+        throw new Error(
+            "You do not have permission to approve schedules"
+        )
+    }
+
+    const batchId = z
+        .string()
+        .uuid()
+        .parse(formData.get("batch_id"))
+
+    /*
+     * Get current batch
+     */
+
+    const {
+        data: batch,
+        error: batchError,
+    } = await supabase
+        .from("schedule_batches")
+        .select("id, status")
+        .eq("id", batchId)
+        .single()
+
+    if (batchError || !batch) {
+        throw new Error(
+            "Schedule batch not found"
+        )
+    }
+
+    if (batch.status !== "draft") {
+        throw new Error(
+            "Only draft schedules can be approved"
+        )
+    }
+
+    /*
+     * Server-side validation
+     */
+
+    const validation =
+        await getScheduleBatchValidation(
+            batchId
+        )
+
+    if (!validation.valid) {
+        throw new Error(
+            `Schedule cannot be approved: ${validation.errors.join(
+                " "
+            )}`
+        )
+    }
+
+    const now = new Date().toISOString()
+
+    const { error: updateError } =
+        await supabase
+            .from("schedule_batches")
+            .update({
+                status: "approved",
+                approved_at: now,
+                updated_at: now,
+            })
+            .eq("id", batchId)
+            .eq("status", "draft")
+
+    if (updateError) {
+        throw new Error(updateError.message)
+    }
+
+    redirect(`/schedule?batch=${batchId}`)
+}
+
+export async function lockSchedule(
+    formData: FormData
+) {
+    const supabase = await createClient()
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+        throw new Error("Unauthorized")
+    }
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, is_active")
+        .eq("id", user.id)
+        .single()
+
+    if (
+        !profile ||
+        !profile.is_active ||
+        !["admin", "super_admin"].includes(
+            profile.role
+        )
+    ) {
+        throw new Error(
+            "You do not have permission to lock schedules"
+        )
+    }
+
+    const batchId = z
+        .string()
+        .uuid()
+        .parse(formData.get("batch_id"))
+
+    const {
+        data: batch,
+        error: batchError,
+    } = await supabase
+        .from("schedule_batches")
+        .select("id, status")
+        .eq("id", batchId)
+        .single()
+
+    if (batchError || !batch) {
+        throw new Error(
+            "Schedule batch not found"
+        )
+    }
+
+    if (batch.status !== "approved") {
+        throw new Error(
+            "Only approved schedules can be locked"
+        )
+    }
+
+    /*
+     * Validate sekali lagi.
+     *
+     * Contoh:
+     * admin approve
+     * → data berubah
+     * → admin lock
+     *
+     * Kita tak nak lock schedule
+     * yang dah ada conflict.
+     */
+
+    const validation =
+        await getScheduleBatchValidation(
+            batchId
+        )
+
+    if (!validation.valid) {
+        throw new Error(
+            `Schedule cannot be locked: ${validation.errors.join(
+                " "
+            )}`
+        )
+    }
+
+    const now = new Date().toISOString()
+
+    const {
+        data: lockedBatch,
+        error: updateError,
+    } = await supabase
+        .from("schedule_batches")
+        .update({
+            status: "locked",
+            locked_at: now,
+            updated_at: now,
+        })
+        .eq("id", batchId)
+        .eq("status", "approved")
+        .select("id")
+        .maybeSingle()
+
+    if (updateError) {
+        throw new Error(updateError.message)
+    }
+
+    if (!lockedBatch) {
+        throw new Error(
+            "Schedule status changed before it could be locked"
+        )
+    }
+
+    redirect(`/schedule?batch=${batchId}`)
 }
