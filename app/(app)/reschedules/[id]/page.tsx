@@ -580,8 +580,8 @@ export default async function RescheduleDetailPage({
                                     </div>
                                 </div>
 
-                                {targetBooking.attendance_status ===
-                                    "upcoming" && (
+                                {targetBooking.attendance_status === "upcoming" &&
+                                    targetClass.class_date >= today && (
                                         <form
                                             action={
                                                 reopenRescheduleAssignment
@@ -601,6 +601,11 @@ export default async function RescheduleDetailPage({
                                             </button>
                                         </form>
                                     )}
+                                {targetClass.class_date < today && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Assigned class has passed
+                                    </span>
+                                )}
                             </div>
                         </div>
                     )}
