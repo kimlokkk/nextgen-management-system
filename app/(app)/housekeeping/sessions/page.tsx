@@ -17,22 +17,40 @@ export default async function SessionSetupPage() {
     const { data: sessions, error } = await supabase
         .from("session_templates")
         .select(`
-      id,
-      name,
-      day_of_week,
-      start_time,
-      end_time,
-      regular_capacity,
-      replacement_capacity,
-      is_active,
-      branches (
-        name
-      ),
-      programmes (
-        name
-      )
-    `)
+    id,
+    branch_id,
+    programme_id,
+    name,
+    day_of_week,
+    start_time,
+    end_time,
+    regular_capacity,
+    replacement_capacity,
+    is_active
+  `)
         .order("start_time")
+
+    const { data: branches } = await supabase
+        .from("branches")
+        .select("id, name")
+
+    const { data: programmes } = await supabase
+        .from("programmes")
+        .select("id, name")
+
+    const branchMap = new Map(
+        branches?.map((branch) => [
+            branch.id,
+            branch.name,
+        ]) ?? []
+    )
+
+    const programmeMap = new Map(
+        programmes?.map((programme) => [
+            programme.id,
+            programme.name,
+        ]) ?? []
+    )
 
     if (error) {
         return (
@@ -78,11 +96,11 @@ export default async function SessionSetupPage() {
                                 className="border-b last:border-0"
                             >
                                 <td className="px-5 py-4">
-                                    {session.branches?.[0]?.name ?? "-"}
+                                    {branchMap.get(session.branch_id) ?? "-"}
                                 </td>
 
                                 <td className="px-5 py-4">
-                                    {session.programmes?.[0]?.name ?? "-"}
+                                    {programmeMap.get(session.programme_id) ?? "-"}
                                 </td>
 
                                 <td className="px-5 py-4">

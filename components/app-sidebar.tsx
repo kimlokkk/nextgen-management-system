@@ -62,10 +62,13 @@ export function AppSidebar() {
                             Enrollments
                         </Link>
 
-                        <span className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground">
+                        <Link
+                            href="/schedule"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted"
+                        >
                             <CalendarDays className="size-4" />
                             Schedule
-                        </span>
+                        </Link>
 
                         <span className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground">
                             <CreditCard className="size-4" />
