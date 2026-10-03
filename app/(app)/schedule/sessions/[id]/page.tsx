@@ -2,11 +2,42 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { markForReschedule } from "./actions"
+import {
+    countsTowardsRegularCapacity,
+    countsTowardsReplacementCapacity,
+} from "@/lib/reschedule-policy"
 
 type PageProps = {
     params: Promise<{
         id: string
     }>
+}
+
+function getMalaysiaDate() {
+    const parts =
+        new Intl.DateTimeFormat("en-US", {
+            timeZone: "Asia/Kuala_Lumpur",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).formatToParts(new Date())
+
+    const year =
+        parts.find(
+            (part) => part.type === "year"
+        )?.value ?? ""
+
+    const month =
+        parts.find(
+            (part) => part.type === "month"
+        )?.value ?? ""
+
+    const day =
+        parts.find(
+            (part) => part.type === "day"
+        )?.value ?? ""
+
+    return `${year}-${month}-${day}`
 }
 
 export default async function ScheduleSessionPage({
@@ -86,6 +117,7 @@ export default async function ScheduleSessionPage({
     const programme = programmeResult.data
     const batch = batchResult.data
     const bookings = bookingResult.data ?? []
+    const today = getMalaysiaDate()
 
     // =====================================================
     // STUDENTS
@@ -146,16 +178,23 @@ export default async function ScheduleSessionPage({
     // =====================================================
 
     const regularBookings = bookings.filter(
-        (booking) => booking.booking_type === "regular"
+        (booking) =>
+            countsTowardsRegularCapacity(
+                booking
+            )
     )
 
     const replacementBookings = bookings.filter(
-        (booking) => booking.booking_type === "replacement"
+        (booking) =>
+            countsTowardsReplacementCapacity(
+                booking
+            )
     )
 
     const rescheduleBookings = bookings.filter(
         (booking) =>
-            booking.attendance_status === "rescheduled"
+            booking.attendance_status ===
+            "rescheduled"
     )
 
     // =====================================================
@@ -456,7 +495,9 @@ export default async function ScheduleSessionPage({
                                                     "regular" &&
                                                     booking.attendance_status ===
                                                     "upcoming" &&
-                                                    batch?.status === "locked" ? (
+                                                    batch?.status === "locked" &&
+                                                    session.status === "scheduled" &&
+                                                    session.class_date >= today ? (
                                                     <form action={markForReschedule}>
                                                         <input
                                                             type="hidden"
