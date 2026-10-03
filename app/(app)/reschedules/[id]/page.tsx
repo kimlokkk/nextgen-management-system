@@ -8,6 +8,7 @@ import {
 import {
     assignRescheduleSlot,
     reopenRescheduleAssignment,
+    cancelReschedule,
 } from "./actions"
 
 type PageProps = {
@@ -238,6 +239,21 @@ export default async function RescheduleDetailPage({
 
     const today = getMalaysiaDate()
 
+    const canCancelReschedule =
+        ["open", "scheduled"].includes(
+            obligation.status
+        ) &&
+        originalClass.class_date >= today &&
+        (
+            obligation.status === "open" ||
+            (
+                targetBooking?.attendance_status ===
+                "upcoming" &&
+                targetClass &&
+                targetClass.class_date >= today
+            )
+        )
+
     const { data: candidateSessions } =
         lockedBatchIds.length > 0
             ? await supabase
@@ -431,9 +447,34 @@ export default async function RescheduleDetailPage({
             {/* ORIGINAL CLASS */}
 
             <div className="rounded-xl border bg-background p-6">
-                <h2 className="font-semibold">
-                    Original Class
-                </h2>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h2 className="font-semibold">
+                            Original Class
+                        </h2>
+
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Original regular class before rescheduling.
+                        </p>
+                    </div>
+
+                    {canCancelReschedule && (
+                        <form action={cancelReschedule}>
+                            <input
+                                type="hidden"
+                                name="obligation_id"
+                                value={obligation.id}
+                            />
+
+                            <button
+                                type="submit"
+                                className="text-sm font-medium text-destructive underline underline-offset-4"
+                            >
+                                Cancel Reschedule
+                            </button>
+                        </form>
+                    )}
+                </div>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-4">
                     <div>
@@ -485,6 +526,26 @@ export default async function RescheduleDetailPage({
                     </div>
                 </div>
             </div>
+
+            {obligation.status !== "cancelled" &&
+                originalClass.class_date < today && (
+                    <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
+                        Original class has already passed.
+                        This reschedule can no longer be cancelled
+                        back to the original class.
+                    </div>
+                )}
+
+            {obligation.status === "scheduled" &&
+                targetClass &&
+                targetClass.class_date < today &&
+                originalClass.class_date >= today && (
+                    <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
+                        The assigned reschedule class has already
+                        passed. This reschedule can no longer be
+                        cancelled automatically.
+                    </div>
+                )}
 
             {/* ASSIGNED CLASS */}
 

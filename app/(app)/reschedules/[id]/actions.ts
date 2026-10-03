@@ -16,6 +16,10 @@ const reopenSchema = z.object({
     obligation_id: z.string().uuid(),
 })
 
+const cancelSchema = z.object({
+    obligation_id: z.string().uuid(),
+})
+
 function getMalaysiaDate() {
     const parts =
         new Intl.DateTimeFormat("en-US", {
@@ -710,4 +714,457 @@ export async function reopenRescheduleAssignment(
     redirect(
         `/reschedules/${obligation.id}`
     )
+}
+
+export async function cancelReschedule(
+    formData: FormData
+) {
+    const supabase = await createClient()
+
+    // =====================================================
+    // AUTH
+    // =====================================================
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+        throw new Error("Unauthorized")
+    }
+
+    const { data: profile } =
+        await supabase
+            .from("profiles")
+            .select("role, is_active")
+            .eq("id", user.id)
+            .single()
+
+    if (
+        !profile ||
+        !profile.is_active ||
+        !["admin", "super_admin"].includes(
+            profile.role
+        )
+    ) {
+        throw new Error(
+            "You do not have permission to cancel reschedules"
+        )
+    }
+
+    // =====================================================
+    // INPUT
+    // =====================================================
+
+    const parsed = cancelSchema.safeParse({
+        obligation_id:
+            formData.get("obligation_id"),
+    })
+
+    if (!parsed.success) {
+        throw new Error(
+            "Invalid cancel reschedule request"
+        )
+    }
+
+    const { obligation_id } =
+        parsed.data
+
+    // =====================================================
+    // OBLIGATION
+    // =====================================================
+
+    const {
+        data: obligation,
+        error: obligationError,
+    } = await supabase
+        .from("makeup_obligations")
+        .select(`
+            id,
+            obligation_type,
+            status,
+            source_booking_id,
+            target_booking_id
+        `)
+        .eq("id", obligation_id)
+        .single()
+
+    if (
+        obligationError ||
+        !obligation
+    ) {
+        throw new Error(
+            "Reschedule obligation not found"
+        )
+    }
+
+    if (
+        obligation.obligation_type !==
+        "reschedule"
+    ) {
+        throw new Error(
+            "This obligation is not a reschedule"
+        )
+    }
+
+    if (
+        !["open", "scheduled"].includes(
+            obligation.status
+        )
+    ) {
+        throw new Error(
+            "Only open or scheduled reschedules can be cancelled"
+        )
+    }
+
+    const previousStatus =
+        obligation.status
+
+    // =====================================================
+    // ORIGINAL BOOKING
+    // =====================================================
+
+    const {
+        data: sourceBooking,
+        error: sourceBookingError,
+    } = await supabase
+        .from("student_bookings")
+        .select(`
+            id,
+            class_session_id,
+            booking_type,
+            attendance_status
+        `)
+        .eq(
+            "id",
+            obligation.source_booking_id
+        )
+        .single()
+
+    if (
+        sourceBookingError ||
+        !sourceBooking
+    ) {
+        throw new Error(
+            "Original booking not found"
+        )
+    }
+
+    if (
+        sourceBooking.booking_type !==
+        "regular"
+    ) {
+        throw new Error(
+            "Original booking is not a regular booking"
+        )
+    }
+
+    if (
+        sourceBooking.attendance_status !==
+        "rescheduled"
+    ) {
+        throw new Error(
+            "Original booking is not marked as rescheduled"
+        )
+    }
+
+    // =====================================================
+    // ORIGINAL CLASS
+    // =====================================================
+
+    const {
+        data: originalClass,
+        error: originalClassError,
+    } = await supabase
+        .from("class_sessions")
+        .select(`
+            id,
+            schedule_batch_id,
+            class_date,
+            status
+        `)
+        .eq(
+            "id",
+            sourceBooking.class_session_id
+        )
+        .single()
+
+    if (
+        originalClassError ||
+        !originalClass
+    ) {
+        throw new Error(
+            "Original class not found"
+        )
+    }
+
+    if (
+        originalClass.status !== "scheduled"
+    ) {
+        throw new Error(
+            "Original class is no longer scheduled"
+        )
+    }
+
+    if (
+        originalClass.class_date <
+        getMalaysiaDate()
+    ) {
+        throw new Error(
+            "A past reschedule cannot be cancelled back to the original class"
+        )
+    }
+
+    // =====================================================
+    // ORIGINAL BATCH
+    // =====================================================
+
+    const { data: originalBatch } =
+        await supabase
+            .from("schedule_batches")
+            .select("status")
+            .eq(
+                "id",
+                originalClass.schedule_batch_id
+            )
+            .single()
+
+    if (
+        !originalBatch ||
+        originalBatch.status !== "locked"
+    ) {
+        throw new Error(
+            "Original schedule must be locked"
+        )
+    }
+
+    // =====================================================
+    // TARGET BOOKING
+    // Only exists if obligation is scheduled.
+    // =====================================================
+
+    let targetBooking: {
+        id: string
+        class_session_id: string
+        booking_type: string
+        attendance_status: string
+    } | null = null
+
+    if (previousStatus === "scheduled") {
+        if (!obligation.target_booking_id) {
+            throw new Error(
+                "Scheduled reschedule has no target booking"
+            )
+        }
+
+        const {
+            data: loadedTargetBooking,
+            error: targetBookingError,
+        } = await supabase
+            .from("student_bookings")
+            .select(`
+                id,
+                class_session_id,
+                booking_type,
+                attendance_status
+            `)
+            .eq(
+                "id",
+                obligation.target_booking_id
+            )
+            .single()
+
+        if (
+            targetBookingError ||
+            !loadedTargetBooking
+        ) {
+            throw new Error(
+                "Assigned booking could not be found"
+            )
+        }
+
+        if (
+            loadedTargetBooking.booking_type !==
+            "reschedule"
+        ) {
+            throw new Error(
+                "Assigned booking is not a reschedule booking"
+            )
+        }
+
+        if (
+            loadedTargetBooking.attendance_status !==
+            "upcoming"
+        ) {
+            throw new Error(
+                "Only upcoming reschedule bookings can be cancelled"
+            )
+        }
+
+        const {
+            data: targetClass,
+            error: targetClassError,
+        } = await supabase
+            .from("class_sessions")
+            .select(`
+                id,
+                class_date,
+                status
+            `)
+            .eq(
+                "id",
+                loadedTargetBooking.class_session_id
+            )
+            .single()
+
+        if (
+            targetClassError ||
+            !targetClass
+        ) {
+            throw new Error(
+                "Assigned class could not be found"
+            )
+        }
+
+        if (
+            targetClass.class_date <
+            getMalaysiaDate()
+        ) {
+            throw new Error(
+                "A reschedule with a past assigned class cannot be cancelled"
+            )
+        }
+
+        targetBooking =
+            loadedTargetBooking
+    }
+
+    // =====================================================
+    // RESTORE ORIGINAL BOOKING
+    // rescheduled -> upcoming
+    // =====================================================
+
+    const {
+        data: restoredSource,
+        error: restoreError,
+    } = await supabase
+        .from("student_bookings")
+        .update({
+            attendance_status: "upcoming",
+            updated_at:
+                new Date().toISOString(),
+        })
+        .eq("id", sourceBooking.id)
+        .eq(
+            "attendance_status",
+            "rescheduled"
+        )
+        .select("id")
+        .maybeSingle()
+
+    if (
+        restoreError ||
+        !restoredSource
+    ) {
+        throw new Error(
+            restoreError?.message ??
+            "Original booking could not be restored"
+        )
+    }
+
+    // =====================================================
+    // CANCEL OBLIGATION
+    // =====================================================
+
+    const {
+        data: cancelledObligation,
+        error: cancelError,
+    } = await supabase
+        .from("makeup_obligations")
+        .update({
+            status: "cancelled",
+            target_booking_id: null,
+            updated_at:
+                new Date().toISOString(),
+        })
+        .eq("id", obligation.id)
+        .eq("status", previousStatus)
+        .select("id")
+        .maybeSingle()
+
+    if (
+        cancelError ||
+        !cancelledObligation
+    ) {
+        /*
+         * Roll back source booking.
+         */
+
+        await supabase
+            .from("student_bookings")
+            .update({
+                attendance_status:
+                    "rescheduled",
+                updated_at:
+                    new Date().toISOString(),
+            })
+            .eq("id", sourceBooking.id)
+
+        throw new Error(
+            cancelError?.message ??
+            "Reschedule status changed before cancellation completed"
+        )
+    }
+
+    // =====================================================
+    // DELETE TARGET BOOKING
+    // =====================================================
+
+    if (targetBooking) {
+        const { error: deleteError } =
+            await supabase
+                .from("student_bookings")
+                .delete()
+                .eq(
+                    "id",
+                    targetBooking.id
+                )
+
+        if (deleteError) {
+            /*
+             * Roll back obligation + source.
+             */
+
+            await supabase
+                .from("makeup_obligations")
+                .update({
+                    status:
+                        previousStatus,
+                    target_booking_id:
+                        targetBooking.id,
+                    updated_at:
+                        new Date().toISOString(),
+                })
+                .eq("id", obligation.id)
+
+            await supabase
+                .from("student_bookings")
+                .update({
+                    attendance_status:
+                        "rescheduled",
+                    updated_at:
+                        new Date().toISOString(),
+                })
+                .eq(
+                    "id",
+                    sourceBooking.id
+                )
+
+            throw new Error(
+                deleteError.message
+            )
+        }
+    }
+
+    redirect("/reschedules")
 }
