@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
+import {
+    countsTowardsRegularCapacity,
+    countsTowardsReplacementCapacity,
+} from "@/lib/reschedule-policy"
 
 export type ScheduleValidationResult = {
     valid: boolean
@@ -61,12 +65,13 @@ export async function getScheduleBatchValidation(
         await supabase
             .from("student_bookings")
             .select(`
-        id,
-        class_session_id,
-        student_id,
-        enrollment_id,
-        booking_type
-      `)
+            id,
+            class_session_id,
+            student_id,
+            enrollment_id,
+            booking_type,
+            attendance_status
+        `)
             .in("class_session_id", sessionIds)
 
     if (bookingError) {
@@ -165,15 +170,17 @@ export async function getScheduleBatchValidation(
         const regularCount =
             sessionBookings.filter(
                 (booking) =>
-                    booking.booking_type ===
-                    "regular"
+                    countsTowardsRegularCapacity(
+                        booking
+                    )
             ).length
 
         const replacementCount =
             sessionBookings.filter(
                 (booking) =>
-                    booking.booking_type ===
-                    "replacement"
+                    countsTowardsReplacementCapacity(
+                        booking
+                    )
             ).length
 
         if (
@@ -286,12 +293,24 @@ export async function getScheduleBatchValidation(
     // OVERLAPPING STUDENT CLASSES
     // =====================================================
 
+    const activeBookings =
+        allBookings.filter(
+            (booking) =>
+                ![
+                    "rescheduled",
+                    "cancelled",
+                    "not_scheduled",
+                ].includes(
+                    booking.attendance_status
+                )
+        )
+
     const bookingsByStudent = new Map<
         string,
         typeof allBookings
     >()
 
-    for (const booking of allBookings) {
+    for (const booking of activeBookings) {
         const current =
             bookingsByStudent.get(
                 booking.student_id
