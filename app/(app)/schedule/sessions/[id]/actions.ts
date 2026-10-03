@@ -128,13 +128,23 @@ export async function markForReschedule(
         error: classError,
     } = await supabase
         .from("class_sessions")
-        .select("schedule_batch_id")
+        .select(`
+        schedule_batch_id,
+        class_date,
+        status
+    `)
         .eq("id", session_id)
         .single()
 
     if (classError || !classSession) {
         throw new Error(
             "Class session not found"
+        )
+    }
+
+    if (classSession.status !== "scheduled") {
+        throw new Error(
+            "Only scheduled classes can be rescheduled"
         )
     }
 
