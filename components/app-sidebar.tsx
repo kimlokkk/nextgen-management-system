@@ -3,6 +3,7 @@ import {
     CalendarDays,
     CreditCard,
     LayoutDashboard,
+    RefreshCw,
     Settings,
     UserRound,
     UsersRound,
@@ -68,6 +69,14 @@ export function AppSidebar() {
                         >
                             <CalendarDays className="size-4" />
                             Schedule
+                        </Link>
+
+                        <Link
+                            href="/reschedules"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted"
+                        >
+                            <RefreshCw className="size-4" />
+                            Reschedules
                         </Link>
 
                         <span className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground">
