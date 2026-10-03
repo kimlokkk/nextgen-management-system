@@ -154,7 +154,8 @@ export default async function ScheduleSessionPage({
     )
 
     const rescheduleBookings = bookings.filter(
-        (booking) => booking.booking_type === "reschedule"
+        (booking) =>
+            booking.attendance_status === "rescheduled"
     )
 
     // =====================================================
