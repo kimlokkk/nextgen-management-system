@@ -5,7 +5,10 @@ import {
     countsTowardsRegularCapacity,
     countsTowardsReplacementCapacity,
 } from "@/lib/reschedule-policy"
-import { assignRescheduleSlot } from "./actions"
+import {
+    assignRescheduleSlot,
+    reopenRescheduleAssignment,
+} from "./actions"
 
 type PageProps = {
     params: Promise<{
@@ -553,27 +556,51 @@ export default async function RescheduleDetailPage({
 
                     {targetBooking && (
                         <div className="mt-5 border-t pt-4">
-                            <div className="flex flex-wrap gap-6 text-sm">
-                                <div>
-                                    <span className="text-muted-foreground">
-                                        Booking Type:
-                                    </span>{" "}
-                                    <span className="font-medium capitalize">
-                                        {targetBooking.booking_type}
-                                    </span>
+                            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                <div className="flex flex-wrap gap-6 text-sm">
+                                    <div>
+                                        <span className="text-muted-foreground">
+                                            Booking Type:
+                                        </span>{" "}
+                                        <span className="font-medium capitalize">
+                                            {targetBooking.booking_type}
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <span className="text-muted-foreground">
+                                            Attendance:
+                                        </span>{" "}
+                                        <span className="font-medium capitalize">
+                                            {targetBooking.attendance_status.replaceAll(
+                                                "_",
+                                                " "
+                                            )}
+                                        </span>
+                                    </div>
                                 </div>
 
-                                <div>
-                                    <span className="text-muted-foreground">
-                                        Attendance:
-                                    </span>{" "}
-                                    <span className="font-medium capitalize">
-                                        {targetBooking.attendance_status.replaceAll(
-                                            "_",
-                                            " "
-                                        )}
-                                    </span>
-                                </div>
+                                {targetBooking.attendance_status ===
+                                    "upcoming" && (
+                                        <form
+                                            action={
+                                                reopenRescheduleAssignment
+                                            }
+                                        >
+                                            <input
+                                                type="hidden"
+                                                name="obligation_id"
+                                                value={obligation.id}
+                                            />
+
+                                            <button
+                                                type="submit"
+                                                className="text-sm font-medium underline underline-offset-4"
+                                            >
+                                                Change Slot
+                                            </button>
+                                        </form>
+                                    )}
                             </div>
                         </div>
                     )}
