@@ -1,6 +1,11 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import {
+    countsTowardsRegularCapacity,
+    countsTowardsReplacementCapacity,
+} from "@/lib/reschedule-policy"
+import { assignRescheduleSlot } from "./actions"
 
 type PageProps = {
     params: Promise<{
@@ -233,7 +238,8 @@ export default async function RescheduleDetailPage({
             id,
             class_session_id,
             student_id,
-            booking_type
+            booking_type,
+            attendance_status
           `)
                 .in(
                     "class_session_id",
@@ -268,15 +274,15 @@ export default async function RescheduleDetailPage({
         ) ?? []
 
     // =====================================================
-    // COUNTS
+    // CAPACITY COUNTS
     // =====================================================
 
-    const regularCounts = new Map<
+    const regularOccupied = new Map<
         string,
         number
     >()
 
-    const replacementCounts = new Map<
+    const replacementOccupied = new Map<
         string,
         number
     >()
@@ -287,23 +293,58 @@ export default async function RescheduleDetailPage({
     >()
 
     for (const booking of candidateBookings ?? []) {
-        const targetMap =
-            booking.booking_type === "regular"
-                ? regularCounts
-                : booking.booking_type ===
-                    "replacement"
-                    ? replacementCounts
-                    : rescheduleCounts
+        if (
+            countsTowardsRegularCapacity(
+                booking
+            )
+        ) {
+            const count =
+                regularOccupied.get(
+                    booking.class_session_id
+                ) ?? 0
 
-        const count =
-            targetMap.get(
-                booking.class_session_id
-            ) ?? 0
+            regularOccupied.set(
+                booking.class_session_id,
+                count + 1
+            )
+        }
 
-        targetMap.set(
-            booking.class_session_id,
-            count + 1
-        )
+        if (
+            countsTowardsReplacementCapacity(
+                booking
+            )
+        ) {
+            const count =
+                replacementOccupied.get(
+                    booking.class_session_id
+                ) ?? 0
+
+            replacementOccupied.set(
+                booking.class_session_id,
+                count + 1
+            )
+        }
+
+        if (
+            booking.booking_type ===
+            "reschedule" &&
+            ![
+                "cancelled",
+                "not_scheduled",
+            ].includes(
+                booking.attendance_status
+            )
+        ) {
+            const count =
+                rescheduleCounts.get(
+                    booking.class_session_id
+                ) ?? 0
+
+            rescheduleCounts.set(
+                booking.class_session_id,
+                count + 1
+            )
+        }
     }
 
     return (
@@ -469,23 +510,17 @@ export default async function RescheduleDetailPage({
                                             </td>
 
                                             <td className="px-5 py-4">
-                                                {regularCounts.get(
+                                                {regularOccupied.get(
                                                     session.id
                                                 ) ?? 0}
                                                 {" / "}
-                                                {
-                                                    session.regular_capacity
-                                                }
+                                                {session.regular_capacity}
                                             </td>
 
                                             <td className="px-5 py-4">
-                                                {replacementCounts.get(
+                                                {replacementOccupied.get(
                                                     session.id
                                                 ) ?? 0}
-                                                {" / "}
-                                                {
-                                                    session.replacement_capacity
-                                                }
                                             </td>
 
                                             <td className="px-5 py-4">
@@ -495,9 +530,47 @@ export default async function RescheduleDetailPage({
                                             </td>
 
                                             <td className="px-5 py-4 text-right">
-                                                <span className="text-xs text-muted-foreground">
-                                                    Assignment pending rule
-                                                </span>
+                                                {(() => {
+                                                    const occupied =
+                                                        regularOccupied.get(
+                                                            session.id
+                                                        ) ?? 0
+
+                                                    const available =
+                                                        session.regular_capacity -
+                                                        occupied
+
+                                                    if (available <= 0) {
+                                                        return (
+                                                            <span className="text-xs font-medium text-destructive">
+                                                                Full
+                                                            </span>
+                                                        )
+                                                    }
+
+                                                    return (
+                                                        <form action={assignRescheduleSlot}>
+                                                            <input
+                                                                type="hidden"
+                                                                name="obligation_id"
+                                                                value={obligation.id}
+                                                            />
+
+                                                            <input
+                                                                type="hidden"
+                                                                name="target_session_id"
+                                                                value={session.id}
+                                                            />
+
+                                                            <button
+                                                                type="submit"
+                                                                className="font-medium underline underline-offset-4"
+                                                            >
+                                                                Assign
+                                                            </button>
+                                                        </form>
+                                                    )
+                                                })()}
                                             </td>
                                         </tr>
                                     )
