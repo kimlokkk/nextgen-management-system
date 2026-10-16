@@ -377,7 +377,7 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
                                     <tr>
                                         <td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">
                                             No available yellow slots in the current locked schedules.
-                                            Generate and lock another month's schedule to find more choices.
+                                            Generate and lock another month&apos;s schedule to find more choices.
                                         </td>
                                     </tr>
                                 )}
