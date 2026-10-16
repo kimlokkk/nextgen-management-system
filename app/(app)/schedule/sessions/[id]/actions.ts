@@ -9,6 +9,12 @@ const rescheduleSchema = z.object({
     session_id: z.string().uuid(),
 })
 
+const replacementSchema = z.object({
+    booking_id: z.string().uuid(),
+    session_id: z.string().uuid(),
+    mode: z.enum(["planned", "absent"]),
+})
+
 function getMalaysiaDate() {
     const parts =
         new Intl.DateTimeFormat("en-US", {
@@ -395,4 +401,48 @@ export async function markForReschedule(
     redirect(
         `/schedule/sessions/${session_id}`
     )
+}
+
+// =====================================================
+// REPLACEMENT ENGINE V1: CREATE / CONFIRM OBLIGATION
+// The database RPC handles permission, concurrency and
+// atomic updates. Never release the source regular seat.
+// =====================================================
+
+export async function initiateReplacement(formData: FormData) {
+    const parsed = replacementSchema.safeParse({
+        booking_id: formData.get("booking_id"),
+        session_id: formData.get("session_id"),
+        mode: formData.get("mode"),
+    })
+
+    if (!parsed.success) {
+        throw new Error("Invalid replacement request")
+    }
+
+    const { booking_id, session_id, mode } = parsed.data
+    const supabase = await createClient()
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+        throw new Error("Unauthorized")
+    }
+
+    const { error } = await supabase.rpc(
+        "initiate_replacement_obligation",
+        {
+            p_booking_id: booking_id,
+            p_session_id: session_id,
+            p_mode: mode,
+        }
+    )
+
+    if (error) {
+        throw new Error(error.message)
+    }
+
+    redirect(`/schedule/sessions/${session_id}`)
 }
