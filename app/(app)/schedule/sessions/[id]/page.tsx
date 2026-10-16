@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { markForReschedule } from "./actions"
+import { markForReschedule, initiateReplacement } from "./actions"
 import {
     countsTowardsRegularCapacity,
     countsTowardsReplacementCapacity,
@@ -38,6 +38,21 @@ function getMalaysiaDate() {
         )?.value ?? ""
 
     return `${year}-${month}-${day}`
+}
+
+function getMalaysiaTime() {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Kuala_Lumpur",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23",
+    }).formatToParts(new Date())
+
+    const getPart = (type: string) =>
+        parts.find((part) => part.type === type)?.value ?? "00"
+
+    return `${getPart("hour")}:${getPart("minute")}:${getPart("second")}`
 }
 
 export default async function ScheduleSessionPage({
@@ -118,6 +133,10 @@ export default async function ScheduleSessionPage({
     const batch = batchResult.data
     const bookings = bookingResult.data ?? []
     const today = getMalaysiaDate()
+    const sessionEnded =
+        session.class_date < today ||
+        (session.class_date === today &&
+            session.end_time.slice(0, 8) <= getMalaysiaTime())
 
     // =====================================================
     // STUDENTS
@@ -486,38 +505,83 @@ export default async function ScheduleSessionPage({
 
                                             <td className="px-6 py-4">
                                                 {hasActiveObligation ? (
-                                                    <span className="text-sm font-medium capitalize">
-                                                        {obligation.obligation_type}
-                                                        {" · "}
-                                                        {obligation.status}
-                                                    </span>
-                                                ) : booking.booking_type ===
-                                                    "regular" &&
-                                                    booking.attendance_status ===
-                                                    "upcoming" &&
+                                                    <div className="flex flex-col items-start gap-2">
+                                                        <span className="text-sm font-medium capitalize">
+                                                            {obligation.obligation_type}
+                                                            {" · "}
+                                                            {obligation.status}
+                                                            {obligation.obligation_type === "replacement" &&
+                                                                booking.attendance_status === "upcoming" &&
+                                                                " · planned"}
+                                                        </span>
+
+                                                        {obligation.obligation_type === "replacement" &&
+                                                            ["open", "scheduled"].includes(obligation.status) &&
+                                                            booking.booking_type === "regular" &&
+                                                            booking.attendance_status === "upcoming" &&
+                                                            sessionEnded &&
+                                                            batch?.status === "locked" &&
+                                                            session.status === "scheduled" && (
+                                                                <form action={initiateReplacement}>
+                                                                    <input type="hidden" name="booking_id" value={booking.id} />
+                                                                    <input type="hidden" name="session_id" value={session.id} />
+                                                                    <input type="hidden" name="mode" value="absent" />
+                                                                    <button
+                                                                        type="submit"
+                                                                        className="text-sm font-medium underline underline-offset-4"
+                                                                    >
+                                                                        Confirm Absence
+                                                                    </button>
+                                                                </form>
+                                                            )}
+                                                    </div>
+                                                ) : booking.booking_type === "regular" &&
+                                                    ["upcoming", "absent"].includes(booking.attendance_status) &&
                                                     batch?.status === "locked" &&
-                                                    session.status === "scheduled" &&
-                                                    session.class_date >= today ? (
-                                                    <form action={markForReschedule}>
-                                                        <input
-                                                            type="hidden"
-                                                            name="booking_id"
-                                                            value={booking.id}
-                                                        />
+                                                    session.status === "scheduled" ? (
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        {booking.attendance_status === "upcoming" &&
+                                                            !sessionEnded &&
+                                                            (!obligation || obligation.obligation_type === "reschedule") && (
+                                                                <form action={markForReschedule}>
+                                                                    <input type="hidden" name="booking_id" value={booking.id} />
+                                                                    <input type="hidden" name="session_id" value={session.id} />
+                                                                    <button
+                                                                        type="submit"
+                                                                        className="text-sm font-medium underline underline-offset-4"
+                                                                    >
+                                                                        Mark Reschedule
+                                                                    </button>
+                                                                </form>
+                                                            )}
 
-                                                        <input
-                                                            type="hidden"
-                                                            name="session_id"
-                                                            value={session.id}
-                                                        />
+                                                        {(!obligation || obligation.obligation_type === "replacement") &&
+                                                            (sessionEnded || booking.attendance_status === "upcoming") && (
+                                                                <form action={initiateReplacement}>
+                                                                    <input type="hidden" name="booking_id" value={booking.id} />
+                                                                    <input type="hidden" name="session_id" value={session.id} />
+                                                                    <input
+                                                                        type="hidden"
+                                                                        name="mode"
+                                                                        value={sessionEnded ? "absent" : "planned"}
+                                                                    />
+                                                                    <button
+                                                                        type="submit"
+                                                                        className="text-sm font-medium underline underline-offset-4"
+                                                                    >
+                                                                        {sessionEnded ? "Mark Absent / Replacement" : "Plan Replacement"}
+                                                                    </button>
+                                                                </form>
+                                                            )}
 
-                                                        <button
-                                                            type="submit"
-                                                            className="text-sm font-medium underline underline-offset-4"
-                                                        >
-                                                            Mark Reschedule
-                                                        </button>
-                                                    </form>
+                                                        {obligation?.status === "cancelled" &&
+                                                            obligation.obligation_type === "reschedule" &&
+                                                            sessionEnded && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Existing cancelled reschedule record
+                                                                </span>
+                                                            )}
+                                                    </div>
                                                 ) : (
                                                     <span className="text-muted-foreground">
                                                         -
