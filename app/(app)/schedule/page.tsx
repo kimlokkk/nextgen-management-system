@@ -143,7 +143,7 @@ export default async function SchedulePage({
             (session) => session.id
         ) ?? []
 
-    let bookingCounts = new Map<string, number>()
+    const bookingCounts = new Map<string, number>()
 
     if (sessionIds.length > 0) {
         const { data: bookings } = await supabase
