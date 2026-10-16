@@ -4,6 +4,7 @@ import {
     CreditCard,
     LayoutDashboard,
     RefreshCw,
+    RotateCcw,
     Settings,
     UserRound,
     UsersRound,
@@ -77,6 +78,14 @@ export function AppSidebar() {
                         >
                             <RefreshCw className="size-4" />
                             Reschedules
+                        </Link>
+
+                        <Link
+                            href="/replacements"
+                            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted"
+                        >
+                            <RotateCcw className="size-4" />
+                            Replacements
                         </Link>
 
                         <span className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground">
