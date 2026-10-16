@@ -25,3 +25,34 @@ jobs:
         run: npm run lint
       - name: Build
         run: npm run build
+
+  sql-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run isolated replacement RPC integration tests
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/sql/replacement_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/011_replacement_initiation.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/012_replacement_assignment.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/replacement_integration.sql
