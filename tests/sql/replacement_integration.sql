@@ -1,5 +1,6 @@
 -- Execute after replacement_fixture.sql and both RPC migrations.
 -- Raises on any failed assertion so GitHub Actions fails deterministically.
+set test.actor = '00000000-0000-4000-8000-000000000001';
 do $$
 declare
     o1 uuid;
