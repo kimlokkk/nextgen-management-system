@@ -337,7 +337,7 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
                         <h2 className="text-xl font-semibold">Available Yellow Slots</h2>
                         <p className="mt-1 text-sm text-muted-foreground">
                             Locked future classes only. Regular seats cannot be used. We also exclude
-                            the student's own weekly class time and overlapping bookings.
+                            the student&apos;s own weekly class time and overlapping bookings.
                             The database rechecks eligibility when assigning.
                         </p>
                     </div>
