@@ -44,12 +44,30 @@ export function AppSidebar() {
     const pathname = usePathname()
     const [open, setOpen] = useState(false)
     const closeButton = useRef<HTMLButtonElement>(null)
+    const sidebarRef = useRef<HTMLElement>(null)
 
     useEffect(() => {
         if (!open) return
 
         const onEscape = (event: KeyboardEvent) => {
-            if (event.key === "Escape") setOpen(false)
+            if (event.key === "Escape") {
+                setOpen(false)
+                return
+            }
+            if (event.key !== "Tab" || window.matchMedia("(min-width: 768px)").matches) return
+            const focusables = sidebarRef.current?.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled])'
+            )
+            if (!focusables?.length) return
+            const first = focusables[0]
+            const last = focusables[focusables.length - 1]
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault()
+                last.focus()
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault()
+                first.focus()
+            }
         }
         const previousOverflow = document.body.style.overflow
         document.body.style.overflow = "hidden"
@@ -84,9 +102,12 @@ export function AppSidebar() {
             )}
 
             <aside
+                ref={sidebarRef}
                 id="nextgen-sidebar"
+                role={open ? "dialog" : undefined}
+                aria-modal={open ? true : undefined}
                 aria-label="Main navigation"
-                className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r bg-background shadow-xl transition-transform duration-200 ease-out md:z-30 md:w-64 md:max-w-none md:translate-x-0 md:shadow-none ${open ? "translate-x-0" : "-translate-x-full"}`}
+                className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r bg-background shadow-xl transition-transform duration-200 ease-out md:z-30 md:w-64 md:max-w-none md:translate-x-0 md:shadow-none ${open ? "translate-x-0 visible pointer-events-auto" : "-translate-x-full invisible pointer-events-none md:visible md:pointer-events-auto"}`}
             >
                 <div className="flex h-16 shrink-0 items-center justify-between border-b px-5">
                     <Link href="/dashboard" onClick={() => setOpen(false)}
