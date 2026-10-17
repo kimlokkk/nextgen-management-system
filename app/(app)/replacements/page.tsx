@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
+import { QueueOverview, type QueueEntry } from "@/components/queue-overview"
 
 export default async function ReplacementsPage() {
     const supabase = await createClient()
@@ -108,47 +109,29 @@ export default async function ReplacementsPage() {
                             const target = item.target_booking_id ? targets.get(item.target_booking_id) : null
                             const assigned = target ? classMap.get(target.class_session_id) : null
 
-                            return (
-                                <tr key={item.id} className="border-b last:border-0">
-                                    <td className="px-5 py-4 font-medium">{students.get(item.student_id) ?? "Student"}</td>
-                                    <td className="px-5 py-4">
-                                        {original ? `${original.class_date} · ${original.start_time.slice(0, 5)}` : "Missing original"}
-                                    </td>
-                                    <td className="px-5 py-4">
-                                        {original ? `${branches.get(original.branch_id) ?? "-"} · ${programmes.get(original.programme_id) ?? "-"}` : "-"}
-                                    </td>
-                                    <td className="px-5 py-4 capitalize">
-                                        {source?.attendance_status === "absent" ? "Confirmed absent" : "Planned"}
-                                    </td>
-                                    <td className="px-5 py-4 capitalize">{item.status}</td>
-                                    <td className="px-5 py-4">
-                                        {assigned
-                                            ? `${assigned.class_date} · ${assigned.start_time.slice(0, 5)}`
-                                            : item.status === "scheduled" || item.status === "completed"
-                                                ? "Missing target"
-                                                : item.status === "cancelled" ? "Cancelled" : "Waiting"}
-                                    </td>
-                                    <td className="px-5 py-4 text-right">
-                                        <Link
-                                            href={`/replacements/${item.id}`}
-                                            className="ui-action-link"
-                                        >
-                                            {item.status === "open" ? "Find Yellow Slot" : "View"}
-                                        </Link>
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                        {rows.length === 0 && (
-                            <tr>
-                                <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">
-                                    No replacement records yet.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    )
+                            const entries: QueueEntry[] = rows.map((item) => {
+        const source = sources.get(item.source_booking_id)
+        const original = source ? classMap.get(source.class_session_id) : null
+        const target = item.target_booking_id ? targets.get(item.target_booking_id) : null
+        const assigned = target ? classMap.get(target.class_session_id) : null
+
+        return {
+            id: item.id,
+            student: students.get(item.student_id) ?? "Student",
+            programme: original ? (programmes.get(original.programme_id) ?? "Programme unavailable") : "Programme unavailable",
+            branch: original ? (branches.get(original.branch_id) ?? "Branch unavailable") : "Branch unavailable",
+            originalDate: original?.class_date ?? "",
+            originalTime: original
+                ? `${original.start_time.slice(0, 5)}–${original.end_time.slice(0, 5)}`
+                : "",
+            destination: assigned
+                ? `${assigned.class_date} · ${assigned.start_time.slice(0, 5)}–${assigned.end_time.slice(0, 5)}`
+                : item.status === "scheduled" || item.status === "completed"
+                    ? "Assignment unavailable" : undefined,
+            status: item.status,
+            attendance: source?.attendance_status === "absent" ? "Confirmed absent" : "Planned",
+        }
+    })
+
+    return <QueueOverview kind="replacement" entries={entries} />
 }
