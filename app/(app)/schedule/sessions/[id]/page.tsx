@@ -569,7 +569,11 @@ export default async function ScheduleSessionPage({
                                                                         type="submit"
                                                                         className="text-sm font-medium underline underline-offset-4"
                                                                     >
-                                                                        {sessionEnded ? "Mark Absent / Replacement" : "Plan Replacement"}
+                                                                        {obligation?.obligation_type === "replacement" && obligation.status === "cancelled"
+                                                                            ? "Reopen Replacement"
+                                                                            : sessionEnded
+                                                                                ? "Mark Absent / Replacement"
+                                                                                : "Plan Replacement"}
                                                                     </button>
                                                                 </form>
                                                             )}
