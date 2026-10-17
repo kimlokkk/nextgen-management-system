@@ -516,7 +516,7 @@ export default async function ScheduleSessionPage({
                                                         </span>
 
                                                         {obligation.obligation_type === "replacement" &&
-                                                            ["open", "scheduled"].includes(obligation.status) &&
+                                                            ["open", "scheduled", "completed"].includes(obligation.status) &&
                                                             booking.booking_type === "regular" &&
                                                             booking.attendance_status === "upcoming" &&
                                                             sessionEnded &&
