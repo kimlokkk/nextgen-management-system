@@ -333,7 +333,7 @@ export default async function SchedulePage({
                                             <td className="px-5 py-4 text-right">
                                                 <Link
                                                     href={`/schedule?batch=${schedule.id}`}
-                                                    className="font-medium underline underline-offset-4"
+                                                    className="ui-action-link"
                                                 >
                                                     View
                                                 </Link>
@@ -595,7 +595,7 @@ export default async function SchedulePage({
                                                 <td className="px-5 py-4">
                                                     <Link
                                                         href={`/schedule/sessions/${session.id}`}
-                                                        className="font-medium underline underline-offset-4"
+                                                        className="ui-action-link"
                                                     >
                                                         Review
                                                     </Link>
