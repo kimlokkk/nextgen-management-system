@@ -51,7 +51,11 @@ function Status({ status }: { status: string }) {
             ? "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-300"
             : status === "completed"
                 ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
-                : "border-border bg-muted/50 text-foreground/80"}`}>
+                : status === "scheduled"
+                    ? "border-sky-500/25 bg-sky-500/10 text-sky-800 dark:text-sky-300"
+                    : status === "cancelled"
+                        ? "border-rose-500/25 bg-rose-500/10 text-rose-800 dark:text-rose-300"
+                        : "border-border bg-muted/50 text-foreground/80"}`}>
             {icon}
             {labels[status] ?? status}
         </span>
@@ -116,7 +120,7 @@ export function QueueOverview({ kind, entries }: { kind: Kind; entries: QueueEnt
                     { label: "Scheduled", value: scheduled, description: "Class assigned" },
                     { label: "History", value: history, description: "Done or cancelled" },
                 ].map((item) => (
-                    <div key={item.label} className="rounded-xl border bg-background p-3 sm:p-5">
+                    <div key={item.label} className="rounded-xl border bg-card p-3 sm:p-5">
                         <p className="text-[11px] font-medium text-muted-foreground sm:text-sm">{item.label}</p>
                         <p className="mt-1 text-2xl font-semibold tabular-nums sm:text-3xl">{item.value}</p>
                         <p className="mt-1 hidden text-xs text-muted-foreground sm:block">{item.description}</p>
@@ -124,7 +128,7 @@ export function QueueOverview({ kind, entries }: { kind: Kind; entries: QueueEnt
                 ))}
             </div>
 
-            <section aria-label="Request records" className="overflow-hidden rounded-xl border bg-background">
+            <section aria-label="Request records" className="overflow-hidden rounded-xl border bg-card">
                 <div className="space-y-3 border-b p-4 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:space-y-0 sm:p-5">
                     <div>
                         <h2 className="text-sm font-semibold">Requests</h2>
@@ -151,7 +155,7 @@ export function QueueOverview({ kind, entries }: { kind: Kind; entries: QueueEnt
                             aria-pressed={filter === option.value}
                             onClick={() => setFilter(option.value)}
                             className={`min-h-9 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm ${filter === option.value
-                                ? "border-foreground bg-foreground text-background"
+                                ? "border-primary bg-primary text-primary-foreground"
                                 : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                         >
                             {option.label}
