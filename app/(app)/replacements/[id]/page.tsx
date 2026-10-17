@@ -309,7 +309,7 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
     return (
         <div className="space-y-6">
             <div>
-                <Link href="/replacements" className="text-sm text-muted-foreground hover:underline">
+                <Link href="/replacements" className="ui-action-link text-muted-foreground">
                     ← Back to replacement queue
                 </Link>
                 <p className="mt-5 text-sm text-muted-foreground">Replacement Details</p>
@@ -341,7 +341,7 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
                                 Yellow slot · {targetBooking.attendance_status}
                             </p>
                             <Link href={`/schedule/sessions/${targetClass.id}`}
-                                className="mt-3 inline-block text-sm font-medium underline underline-offset-4">
+                                className="ui-action-link mt-3">
                                 View assigned class
                             </Link>
                         </>
@@ -357,7 +357,7 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
                 <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-background p-5">
                     <Link
                         href={showChange ? `/replacements/${obligation.id}` : `/replacements/${obligation.id}?change=1`}
-                        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                        className="ui-primary-action"
                     >
                         {showChange ? "Keep Current Slot" : "Change Replacement Slot"}
                     </Link>
@@ -368,7 +368,7 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
                             <input type="checkbox" name="confirm_release" required />
                             Free the seat; keep entitlement open
                         </label>
-                        <button type="submit" className="text-sm font-medium underline underline-offset-4">
+                        <button type="submit" className="ui-action-link">
                             Release Yellow Slot
                         </button>
                     </form>
@@ -453,7 +453,7 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
                                             <form action={showChange ? changeReplacementSlot : assignReplacementSlot}>
                                                 <input type="hidden" name="obligation_id" value={obligation.id} />
                                                 <input type="hidden" name="target_session_id" value={session.id} />
-                                                <button type="submit" className="font-medium underline underline-offset-4">
+                                                <button type="submit" className="ui-action-link">
                                                     {showChange ? "Move to This Slot" : "Assign Yellow Slot"}
                                                 </button>
                                             </form>
