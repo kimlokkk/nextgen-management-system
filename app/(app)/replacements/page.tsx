@@ -15,7 +15,7 @@ export default async function ReplacementsPage() {
             created_at
         `)
         .eq("obligation_type", "replacement")
-        .in("status", ["open", "scheduled"])
+        .in("status", ["open", "scheduled", "completed", "cancelled"])
         .order("created_at", { ascending: true })
 
     if (error) {
@@ -83,7 +83,7 @@ export default async function ReplacementsPage() {
                 <p className="text-sm text-muted-foreground">Scheduling</p>
                 <h1 className="mt-1 text-3xl font-bold">Replacement Queue</h1>
                 <p className="mt-2 text-muted-foreground">
-                    Replacement obligations waiting for yellow seats, including upcoming planned absences.
+                    View open, scheduled, completed and cancelled replacements.
                     Assignments may cross months and can precede the original class date.
                 </p>
             </div>
@@ -96,6 +96,7 @@ export default async function ReplacementsPage() {
                             <th className="px-5 py-3 text-left">Original Class</th>
                             <th className="px-5 py-3 text-left">Branch / Programme</th>
                             <th className="px-5 py-3 text-left">Absence</th>
+                            <th className="px-5 py-3 text-left">Status</th>
                             <th className="px-5 py-3 text-left">Assignment</th>
                             <th className="px-5 py-3 text-right">Action</th>
                         </tr>
@@ -119,10 +120,13 @@ export default async function ReplacementsPage() {
                                     <td className="px-5 py-4 capitalize">
                                         {source?.attendance_status === "absent" ? "Confirmed absent" : "Planned"}
                                     </td>
+                                    <td className="px-5 py-4 capitalize">{item.status}</td>
                                     <td className="px-5 py-4">
                                         {assigned
                                             ? `${assigned.class_date} · ${assigned.start_time.slice(0, 5)}`
-                                            : item.status === "scheduled" ? "Missing target" : "Waiting"}
+                                            : item.status === "scheduled" || item.status === "completed"
+                                                ? "Missing target"
+                                                : item.status === "cancelled" ? "Cancelled" : "Waiting"}
                                     </td>
                                     <td className="px-5 py-4 text-right">
                                         <Link
@@ -137,8 +141,8 @@ export default async function ReplacementsPage() {
                         })}
                         {rows.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
-                                    No open or scheduled replacements.
+                                <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">
+                                    No replacement records yet.
                                 </td>
                             </tr>
                         )}
