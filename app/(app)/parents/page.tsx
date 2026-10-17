@@ -1,56 +1,37 @@
-import { TableScrollArea } from "@/components/table-scroll-area"
 import { createClient } from "@/lib/supabase/server"
+import { RecordDirectory, type DirectoryRow } from "@/components/record-directory"
+import { FormSubmit } from "@/components/form-submit"
 import { createParent } from "./actions"
 
 export default async function ParentsPage() {
     const supabase = await createClient()
-
-    const { data: parents, error } = await supabase
-        .from("parents")
-        .select(`
-      id,
-      full_name,
-      phone,
-      whatsapp_phone,
-      email,
-      notes,
-      created_at
-    `)
+    const { data: parents, error } = await supabase.from("parents")
+        .select("id, full_name, phone, whatsapp_phone, email, notes, created_at")
         .order("full_name")
 
     if (error) {
-        return (
-            <div>
-                <h1 className="text-3xl font-bold">Parents</h1>
-                <p className="mt-4 text-destructive">{error.message}</p>
-            </div>
-        )
+        return <div className="rounded-xl border bg-card p-6">
+            <h1 className="text-2xl font-semibold">Parents</h1>
+            <p className="mt-3 text-sm text-destructive">Could not load parents. {error.message}</p>
+        </div>
     }
 
-    return (
-        <div className="space-y-8">
-            <div>
-                <p className="text-sm text-muted-foreground">
-                    Student Management
-                </p>
+    const rows: DirectoryRow[] = (parents ?? []).map((parent) => ({
+        id: parent.id,
+        title: parent.full_name,
+        fields: [
+            { label: "WhatsApp", value: parent.whatsapp_phone || "—" },
+            { label: "Phone", value: parent.phone || "—" },
+            { label: "Email", value: parent.email || "—" },
+        ],
+        searchText: [parent.full_name, parent.whatsapp_phone, parent.phone, parent.email, parent.notes]
+            .filter(Boolean).join(" "),
+    }))
 
-                <h1 className="mt-1 text-3xl font-bold">
-                    Parents
-                </h1>
-
-                <p className="mt-2 text-muted-foreground">
-                    Manage parent and guardian contact information.
-                </p>
-            </div>
-
-            <div className="rounded-xl border bg-background p-6">
-                <h2 className="text-lg font-semibold">
-                    Add Parent
-                </h2>
-
-                <form
+    const createForm = (
+        <form
                     action={createParent}
-                    className="mt-5 grid gap-4 md:grid-cols-2"
+                    className="grid gap-4 md:grid-cols-2"
                 >
                     <div>
                         <label className="mb-2 block text-sm font-medium">
@@ -113,78 +94,21 @@ export default async function ParentsPage() {
                     </div>
 
                     <div className="md:col-span-2">
-                        <button
-                            type="submit"
-                            className="ui-primary-action"
-                        >
-                            Add Parent
-                        </button>
+                        <FormSubmit>Add Parent</FormSubmit>
                     </div>
                 </form>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border bg-background">
-                <div className="border-b px-6 py-4">
-                    <h2 className="font-semibold">
-                        Parent List
-                    </h2>
-
-                    <p className="text-sm text-muted-foreground">
-                        {parents?.length ?? 0} records
-                    </p>
-                </div>
-
-                <div className="min-w-0 max-w-full">
-                    <TableScrollArea label="Parents list">
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                            <tr className="border-b">
-                                <th className="px-6 py-3 text-left">Name</th>
-                                <th className="px-6 py-3 text-left">WhatsApp</th>
-                                <th className="px-6 py-3 text-left">Phone</th>
-                                <th className="px-6 py-3 text-left">Email</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {parents?.length ? (
-                                parents.map((parent) => (
-                                    <tr
-                                        key={parent.id}
-                                        className="border-b last:border-0"
-                                    >
-                                        <td className="px-6 py-4 font-medium">
-                                            {parent.full_name}
-                                        </td>
-
-                                        <td className="px-6 py-4">
-                                            {parent.whatsapp_phone || "-"}
-                                        </td>
-
-                                        <td className="px-6 py-4">
-                                            {parent.phone || "-"}
-                                        </td>
-
-                                        <td className="px-6 py-4">
-                                            {parent.email || "-"}
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td
-                                        colSpan={4}
-                                        className="px-6 py-10 text-center text-muted-foreground"
-                                    >
-                                        No parents added yet.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                    </TableScrollArea>
-                </div>
-            </div>
-        </div>
     )
+
+    return <RecordDirectory
+        title="Parents"
+        description="Keep guardian contact details organised and easy to find."
+        eyebrow="People"
+        rows={rows}
+        columns={["Parent", "WhatsApp", "Phone", "Email"]}
+        createLabel="Add parent"
+        createForm={createForm}
+        emptyTitle="No parents yet"
+        emptyDescription="Add a parent or guardian before creating a student profile."
+        searchPlaceholder="Search name, phone or email"
+    />
 }
