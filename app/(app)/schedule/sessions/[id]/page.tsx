@@ -349,7 +349,7 @@ export default async function ScheduleSessionPage({
             <div>
                 <Link
                     href={`/schedule?batch=${session.schedule_batch_id}`}
-                    className="text-sm text-muted-foreground hover:underline"
+                    className="ui-action-link text-muted-foreground"
                 >
                     ← Back to monthly schedule
                 </Link>
