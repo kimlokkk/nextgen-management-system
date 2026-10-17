@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { updateSessionCapacity } from "./actions"
@@ -82,6 +83,7 @@ export default async function SessionSetupPage() {
             </div>
 
             <div className="overflow-hidden rounded-xl border bg-background">
+                <TableScrollArea label="Class settings">
                 <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                         <tr className="border-b">
@@ -159,6 +161,7 @@ export default async function SessionSetupPage() {
                         ))}
                     </tbody>
                 </table>
+                </TableScrollArea>
             </div>
         </div>
     )
