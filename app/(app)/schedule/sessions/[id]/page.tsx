@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { markForReschedule, initiateReplacement } from "./actions"
+import { markForReschedule, initiateReplacement, recordAttendance } from "./actions"
 import {
     countsTowardsRegularCapacity,
     countsTowardsReplacementCapacity,
@@ -281,28 +281,44 @@ export default async function ScheduleSessionPage({
         (booking) => booking.id
     )
 
-    const { data: obligations } =
+    const [sourceResult, targetResult] = await Promise.all([
         bookingIds.length > 0
-            ? await supabase
-                .from("makeup_obligations")
-                .select(`
-          id,
-          source_booking_id,
-          obligation_type,
-          status
-        `)
-                .in(
-                    "source_booking_id",
-                    bookingIds
-                )
-            : { data: [] }
+            ? supabase.from("makeup_obligations")
+                .select("id, source_booking_id, obligation_type, status")
+                .in("source_booking_id", bookingIds)
+            : Promise.resolve({ data: [], error: null }),
+        bookingIds.length > 0
+            ? supabase.from("makeup_obligations")
+                .select("id, target_booking_id, obligation_type, status")
+                .in("target_booking_id", bookingIds)
+            : Promise.resolve({ data: [], error: null }),
+    ])
+
+    if (sourceResult.error || targetResult.error) {
+        throw new Error(sourceResult.error?.message ?? targetResult.error?.message)
+    }
 
     const obligationMap = new Map(
-        obligations?.map((obligation) => [
-            obligation.source_booking_id,
-            obligation,
-        ]) ?? []
+        (sourceResult.data ?? []).map((item) => [item.source_booking_id, item])
     )
+    const targetObligationMap = new Map(
+        (targetResult.data ?? []).map((item) => [item.target_booking_id, item])
+    )
+
+    const attendanceEligible = bookings.filter((booking) =>
+        ["upcoming", "present", "absent"].includes(booking.attendance_status)
+    )
+    const presentCount = attendanceEligible.filter((booking) =>
+        booking.attendance_status === "present"
+    ).length
+    const absentCount = attendanceEligible.filter((booking) =>
+        booking.attendance_status === "absent"
+    ).length
+    const upcomingCount = attendanceEligible.filter((booking) =>
+        booking.attendance_status === "upcoming"
+    ).length
+    const canTakeAttendance = batch?.status === "locked"
+        && session.status === "scheduled" && sessionEnded
 
     const uniqueWarnings = [
         ...new Set(warnings),
@@ -410,6 +426,43 @@ export default async function ScheduleSessionPage({
                 </div>
             )}
 
+            {/* ATTENDANCE OVERVIEW */}
+
+            <div className="rounded-xl border bg-background p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 className="font-semibold">Class Attendance</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            {canTakeAttendance
+                                ? "Class ended. Record actual attendance below."
+                                : "Attendance opens after the class ends in Malaysia time."}
+                        </p>
+                    </div>
+                    <span className="rounded-full border px-3 py-1 text-xs font-medium">
+                        {canTakeAttendance ? "Ready for attendance" : "Not yet open"}
+                    </span>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs text-muted-foreground">Present</p>
+                        <p className="mt-1 text-xl font-semibold">{presentCount}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs text-muted-foreground">Absent</p>
+                        <p className="mt-1 text-xl font-semibold">{absentCount}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs text-muted-foreground">Unmarked</p>
+                        <p className="mt-1 text-xl font-semibold">{upcomingCount}</p>
+                    </div>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                    Rescheduled original bookings and cancelled seats are excluded.
+                    Marking a makeup class Present completes its obligation.
+                    Absent makeup bookings require admin follow-up.
+                </p>
+            </div>
+
             {/* STUDENTS */}
 
             <div className="overflow-hidden rounded-xl border bg-background">
@@ -448,6 +501,9 @@ export default async function ScheduleSessionPage({
                                 </th>
 
                                 <th className="px-6 py-3 text-left">
+                                    Mark Attendance
+                                </th>
+                                <th className="px-6 py-3 text-left">
                                     Action
                                 </th>
                             </tr>
@@ -475,6 +531,22 @@ export default async function ScheduleSessionPage({
                                         obligation &&
                                         obligation.status !== "cancelled"
 
+                                    const targetObligation = targetObligationMap.get(booking.id)
+                                    const isRegular = booking.booking_type === "regular"
+                                    const isMakeup = ["reschedule", "replacement"].includes(booking.booking_type)
+                                    const regularBlocked = isRegular
+                                        && obligation?.obligation_type === "reschedule"
+                                        && obligation.status !== "cancelled"
+                                    const canAttend = canTakeAttendance
+                                        && ["upcoming", "present", "absent"].includes(booking.attendance_status)
+                                        && (
+                                            (isRegular && !regularBlocked)
+                                            || (isMakeup && targetObligation?.status === "scheduled")
+                                        )
+                                    const presentBlocked = isRegular
+                                        && obligation?.obligation_type === "replacement"
+                                        && ["open", "scheduled", "completed"].includes(obligation.status)
+
                                     return (
                                         <tr
                                             key={booking.id}
@@ -500,6 +572,53 @@ export default async function ScheduleSessionPage({
                                                 {booking.attendance_status.replaceAll(
                                                     "_",
                                                     " "
+                                                )}
+                                            </td>
+
+                                            <td className="px-6 py-4">
+                                                {canAttend ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {booking.attendance_status !== "present" && !presentBlocked && (
+                                                            <form action={recordAttendance}>
+                                                                <input type="hidden" name="session_id" value={session.id} />
+                                                                <input type="hidden" name="booking_id" value={booking.id} />
+                                                                <input type="hidden" name="attendance" value="present" />
+                                                                <button type="submit"
+                                                                    className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                                                                    Present
+                                                                </button>
+                                                            </form>
+                                                        )}
+                                                        {booking.attendance_status !== "absent" && (
+                                                            <form action={recordAttendance}>
+                                                                <input type="hidden" name="session_id" value={session.id} />
+                                                                <input type="hidden" name="booking_id" value={booking.id} />
+                                                                <input type="hidden" name="attendance" value="absent" />
+                                                                <button type="submit"
+                                                                    className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                                                                    Absent
+                                                                </button>
+                                                            </form>
+                                                        )}
+                                                        {presentBlocked && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Replacement already initiated
+                                                            </span>
+                                                        )}
+                                                        {isMakeup && booking.attendance_status === "absent" && (
+                                                            <span className="text-xs text-amber-700">
+                                                                Needs follow-up
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {booking.attendance_status === "present"
+                                                            ? "Recorded"
+                                                            : booking.attendance_status === "absent"
+                                                                && isMakeup ? "Needs follow-up"
+                                                                : "—"}
+                                                    </span>
                                                 )}
                                             </td>
 
@@ -598,7 +717,7 @@ export default async function ScheduleSessionPage({
                             ) : (
                                 <tr>
                                     <td
-                                        colSpan={6}
+                                        colSpan={7}
                                         className="px-6 py-10 text-center text-muted-foreground"
                                     >
                                         No students assigned to this session.
