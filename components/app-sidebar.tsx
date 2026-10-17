@@ -103,7 +103,7 @@ export function AppSidebar() {
                 <button
                     type="button"
                     aria-label="Close navigation"
-                    className="fixed inset-0 z-40 bg-black/55 md:hidden"
+                    className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] md:hidden"
                     onClick={() => setOpen(false)}
                 />
             )}
@@ -114,12 +114,12 @@ export function AppSidebar() {
                 role={open ? "dialog" : undefined}
                 aria-modal={open ? true : undefined}
                 aria-label="Main navigation"
-                className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r bg-background shadow-xl transition-transform duration-200 ease-out md:z-30 md:w-64 md:max-w-none md:translate-x-0 md:shadow-none ${open ? "translate-x-0 visible pointer-events-auto" : "-translate-x-full invisible pointer-events-none md:visible md:pointer-events-auto"}`}
+                className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-200 ease-out md:z-30 md:w-64 md:max-w-none md:translate-x-0 md:shadow-none ${open ? "translate-x-0 visible pointer-events-auto" : "-translate-x-full invisible pointer-events-none md:visible md:pointer-events-auto"}`}
             >
                 <div className="flex h-16 shrink-0 items-center justify-between border-b px-5">
                     <Link href="/dashboard" onClick={() => setOpen(false)}
                         className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <span className="flex size-9 items-center justify-center rounded-xl bg-foreground text-sm font-bold text-background" aria-hidden="true">
+                        <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm" aria-hidden="true">
                             N
                         </span>
                         <span className="min-w-0">
@@ -154,13 +154,13 @@ export function AppSidebar() {
                                             aria-current={active ? "page" : undefined}
                                             onClick={() => setOpen(false)}
                                             className={`group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active
-                                                ? "bg-foreground/[0.07] text-foreground ring-1 ring-foreground/10 dark:bg-foreground/10"
-                                                : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                                                ? "bg-primary/10 text-primary ring-1 ring-primary/15"
+                                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`}
                                         >
                                             <item.icon aria-hidden="true"
-                                                className={`size-4 shrink-0 ${active ? "text-foreground" : "group-hover:text-foreground"}`} />
+                                                className={`size-4 shrink-0 ${active ? "text-primary" : "group-hover:text-sidebar-accent-foreground"}`} />
                                             <span className="flex-1">{item.label}</span>
-                                            {active && <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
+                                            {active && <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-primary/70" />}
                                         </Link>
                                     )
                                 })}
