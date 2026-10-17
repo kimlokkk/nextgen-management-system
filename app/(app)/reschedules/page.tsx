@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
+import { QueueOverview, type QueueEntry } from "@/components/queue-overview"
 
 export default async function ReschedulesPage() {
     const supabase = await createClient()
@@ -15,6 +16,7 @@ export default async function ReschedulesPage() {
       student_id,
       enrollment_id,
       source_booking_id,
+      target_booking_id,
       obligation_type,
       status,
       reason,
@@ -249,100 +251,55 @@ export default async function ReschedulesPage() {
                                         )
                                         : null
 
-                                return (
-                                    <tr
-                                        key={obligation.id}
-                                        className="border-b last:border-0"
-                                    >
-                                        <td className="px-5 py-4 font-medium">
-                                            {student?.full_name ?? "-"}
-                                        </td>
+                                const targetBookingIds = rows
+        .map((item) => item.target_booking_id)
+        .filter((id): id is string => !!id)
 
-                                        <td className="px-5 py-4">
-                                            {classSession ? (
-                                                <>
-                                                    <div className="font-medium">
-                                                        {classSession.class_date}
-                                                    </div>
+    const { data: targetBookings, error: targetError } = targetBookingIds.length
+        ? await supabase.from("student_bookings")
+            .select("id, class_session_id")
+            .in("id", targetBookingIds)
+        : { data: [], error: null }
 
-                                                    <div className="text-xs text-muted-foreground">
-                                                        W
-                                                        {
-                                                            classSession.week_number
-                                                        }
-                                                        {" · "}
-                                                        {classSession.start_time.slice(
-                                                            0,
-                                                            5
-                                                        )}
-                                                        {" - "}
-                                                        {classSession.end_time.slice(
-                                                            0,
-                                                            5
-                                                        )}
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                "-"
-                                            )}
-                                        </td>
+    if (targetError) {
+        return <p className="text-destructive">Could not load assigned classes.</p>
+    }
 
-                                        <td className="px-5 py-4">
-                                            {classSession
-                                                ? programmeMap.get(
-                                                    classSession.programme_id
-                                                ) ?? "-"
-                                                : "-"}
-                                        </td>
+    const targetSessionIds = [...new Set((targetBookings ?? []).map((item) => item.class_session_id))]
+    const { data: targetSessions, error: sessionError } = targetSessionIds.length
+        ? await supabase.from("class_sessions")
+            .select("id, class_date, start_time, end_time")
+            .in("id", targetSessionIds)
+        : { data: [], error: null }
 
-                                        <td className="px-5 py-4">
-                                            {classSession
-                                                ? branchMap.get(
-                                                    classSession.branch_id
-                                                ) ?? "-"
-                                                : "-"}
-                                        </td>
+    if (sessionError) {
+        return <p className="text-destructive">Could not load reschedule assignments.</p>
+    }
 
-                                        <td className="px-5 py-4">
-                                            <span className="rounded-full border px-3 py-1 text-xs font-medium uppercase">
-                                                {obligation.status}
-                                            </span>
-                                        </td>
+    const targetMap = new Map((targetBookings ?? []).map((item) => [item.id, item.class_session_id]))
+    const targetSessionMap = new Map((targetSessions ?? []).map((item) => [item.id, item]))
 
-                                        <td className="px-5 py-4 text-right">
-                                            {obligation.status ===
-                                                "open" ? (
-                                                <Link
-                                                    href={`/reschedules/${obligation.id}`}
-                                                    className="ui-action-link"
-                                                >
-                                                    Find New Slot
-                                                </Link>
-                                            ) : (
-                                                <Link
-                                                    href={`/reschedules/${obligation.id}`}
-                                                    className="ui-action-link"
-                                                >
-                                                    View
-                                                </Link>
-                                            )}
-                                        </td>
-                                    </tr>
-                                )
-                            })
-                        ) : (
-                            <tr>
-                                <td
-                                    colSpan={6}
-                                    className="px-5 py-10 text-center text-muted-foreground"
-                                >
-                                    No reschedule records yet.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    )
+    const entries: QueueEntry[] = rows.map((obligation) => {
+        const source = sourceBookingMap.get(obligation.source_booking_id)
+        const original = source ? classSessionMap.get(source.class_session_id) : null
+        const targetSessionId = obligation.target_booking_id
+            ? targetMap.get(obligation.target_booking_id) : null
+        const target = targetSessionId ? targetSessionMap.get(targetSessionId) : null
+
+        return {
+            id: obligation.id,
+            student: studentMap.get(obligation.student_id)?.full_name ?? "Student",
+            programme: original ? (programmeMap.get(original.programme_id) ?? "Programme unavailable") : "Programme unavailable",
+            branch: original ? (branchMap.get(original.branch_id) ?? "Branch unavailable") : "Branch unavailable",
+            originalDate: original?.class_date ?? "",
+            originalTime: original ? `${original.start_time.slice(0, 5)}–${original.end_time.slice(0, 5)}` : "",
+            destination: target
+                ? `${target.class_date} · ${target.start_time.slice(0, 5)}–${target.end_time.slice(0, 5)}`
+                : obligation.status === "scheduled" || obligation.status === "completed"
+                    ? "Assignment unavailable" : undefined,
+            status: obligation.status,
+        }
+    })
+
+    return <QueueOverview kind="reschedule" entries={entries} />
 }
