@@ -331,7 +331,7 @@ export default async function DashboardPage() {
                     { label: "Open replacements", value: number(replacementCountResult.count), href: "/replacements", icon: CalendarDays, note: "Awaiting yellow slot" },
                 ].map((item) => (
                     <Link key={item.label} href={item.href}
-                        className="group rounded-xl border bg-background p-5 transition-colors hover:bg-muted/30">
+                        className="ui-interactive-card group rounded-xl border bg-background p-5">
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-muted-foreground">{item.label}</p>
                             <item.icon className="size-5 text-muted-foreground" aria-hidden="true" />
@@ -364,7 +364,7 @@ export default async function DashboardPage() {
                                 const ended = isEnded(session, today, localTime)
                                 return (
                                     <Link key={session.id} href={`/schedule/sessions/${session.id}`}
-                                        className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-muted/30">
+                                        className="group flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50">
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-medium">
                                                 {programmeMap.get(session.programme_id) ?? "Class"}
@@ -418,7 +418,7 @@ export default async function DashboardPage() {
                         <div className="divide-y">
                             {attention.map((item) => (
                                 <Link key={item.id} href={item.href}
-                                    className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-muted/30">
+                                    className="group flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50">
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium">{item.title}</p>
                                         <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
