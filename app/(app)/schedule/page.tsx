@@ -1,5 +1,4 @@
-import Link from "next/link"
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, LockKeyhole, Plus } from "lucide-react"
+import { AlertTriangle, CalendarDays, CheckCircle2, LockKeyhole } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import {
     countsTowardsRegularCapacity,
@@ -7,6 +6,7 @@ import {
 } from "@/lib/reschedule-policy"
 import { getScheduleBatchValidation } from "@/lib/schedule-validation"
 import { FormSubmit } from "@/components/form-submit"
+import { ScheduleActions } from "@/components/schedule-actions"
 import {
     ScheduleBatchLibrary,
     ScheduleClassList,
@@ -147,6 +147,39 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     const maxRegular = classes.reduce((sum, item) => sum + item.regularCapacity, 0)
     const maxYellow = classes.reduce((sum, item) => sum + item.yellowCapacity, 0)
 
+    const generatePanel = (
+        <div className="rounded-lg bg-card p-4 sm:p-5">
+            <div className="mb-4">
+                <h2 className="font-semibold">Generate monthly schedule</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    Select a branch and month to create a new draft.
+                    Regenerating an existing draft will replace that draft and its bookings.
+                    Approved and locked schedules cannot be regenerated.
+                </p>
+            </div>
+            <form action={generateSchedule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                        <div>
+                            <label htmlFor="schedule-generate-branch" className="mb-2 block text-sm font-medium">Branch *</label>
+                            <select id="schedule-generate-branch" name="branch_id" required defaultValue=""
+                                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm">
+                                <option value="" disabled>Select active branch</option>
+                                {branches.filter((branch) => branch.is_active).map((branch) => (
+                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="schedule-generate-month" className="mb-2 block text-sm font-medium">Month *</label>
+                            <input id="schedule-generate-month" type="month" name="month" required defaultValue={currentMonth}
+                                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm" />
+                        </div>
+                        <div className="flex items-end">
+                            <FormSubmit>Generate draft</FormSubmit>
+                        </div>
+                    </form>
+        </div>
+    )
+
     return (
         <div className="min-w-0 space-y-6">
             <header className="flex flex-wrap items-start justify-between gap-4">
@@ -157,10 +190,17 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                         Review monthly classes, monitor seat capacity and open each class for attendance.
                     </p>
                 </div>
-                <Link href="#schedule-library" className="ui-secondary-action">
-                    Browse schedules <ChevronDown className="size-4" aria-hidden="true" />
-                </Link>
             </header>
+
+            <ScheduleActions
+                key={selectedBatch?.id ?? "no-schedule"}
+                selectedLabel={selectedBatch ? formatMonth(selectedBatch.schedule_month) : undefined}
+                selectedBranch={selectedBatch ? branchNames.get(selectedBatch.branch_id) ?? "Branch unavailable" : undefined}
+                scheduleCount={batches.length}
+                initialPanel={batches.length === 0 ? "generate" : params.batch && !selectedBatch ? "browse" : null}
+                library={<ScheduleBatchLibrary batches={batchSummaries} selectedId={selectedBatch?.id ?? null} />}
+                generator={generatePanel}
+            />
 
             {selectedBatch ? (
                 <>
@@ -259,57 +299,13 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                     </h2>
                     <p className="mt-2 text-sm text-muted-foreground">
                         {params.batch
-                            ? "Choose a schedule below. It may have been removed."
-                            : "Generate a draft below to start reviewing classes."}
+                            ? "Use Browse months above to choose another schedule. This one may have been removed."
+                            : "Use Generate draft above to start reviewing classes."}
                     </p>
                 </section>
             )}
 
-            <ScheduleBatchLibrary batches={batchSummaries} selectedId={selectedBatch?.id ?? null} />
 
-            <details id="new-schedule" className="group min-w-0 overflow-hidden rounded-xl border bg-card"
-                open={batches.length === 0}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 transition-colors hover:bg-accent/40 focus-visible:outline-2 focus-visible:outline-ring sm:p-5">
-                    <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Plus className="size-5" aria-hidden="true" />
-                        </span>
-                        <span>
-                            <span className="block font-semibold">Generate monthly schedule</span>
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                                Create or regenerate a draft for a branch and month
-                            </span>
-                        </span>
-                    </div>
-                    <ChevronDown className="size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
-                </summary>
-                <div className="border-t p-4 sm:p-5">
-                    <p className="mb-4 max-w-2xl text-sm leading-6 text-muted-foreground">
-                        Select a branch and month. If a draft already exists for that month, generating again will
-                        replace that draft and its bookings. Approved or locked schedules cannot be regenerated.
-                    </p>
-                    <form action={generateSchedule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                        <div>
-                            <label htmlFor="schedule-generate-branch" className="mb-2 block text-sm font-medium">Branch *</label>
-                            <select id="schedule-generate-branch" name="branch_id" required defaultValue=""
-                                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm">
-                                <option value="" disabled>Select active branch</option>
-                                {branches.filter((branch) => branch.is_active).map((branch) => (
-                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="schedule-generate-month" className="mb-2 block text-sm font-medium">Month *</label>
-                            <input id="schedule-generate-month" type="month" name="month" required defaultValue={currentMonth}
-                                className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm" />
-                        </div>
-                        <div className="flex items-end">
-                            <FormSubmit>Generate draft</FormSubmit>
-                        </div>
-                    </form>
-                </div>
-            </details>
         </div>
     )
 }
