@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
@@ -429,7 +430,8 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
                         </p>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border bg-background">
+                    <div className="overflow-hidden rounded-xl border bg-background">
+                        <TableScrollArea label="Replacement slots">
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50">
                                 <tr className="border-b">
@@ -470,6 +472,7 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
                                 )}
                             </tbody>
                         </table>
+                        </TableScrollArea>
                     </div>
                 </div>
             )}
