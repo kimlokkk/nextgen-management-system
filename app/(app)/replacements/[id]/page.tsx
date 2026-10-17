@@ -364,10 +364,13 @@ export default async function ReplacementDetailPage({ params, searchParams }: Pa
                     <form action={cancelReplacement} className="flex items-center gap-3">
                         <input type="hidden" name="obligation_id" value={obligation.id} />
                         <input type="hidden" name="mode" value="release" />
+                        <label className="flex items-center gap-2 text-xs">
+                            <input type="checkbox" name="confirm_release" required />
+                            Free the seat; keep entitlement open
+                        </label>
                         <button type="submit" className="text-sm font-medium underline underline-offset-4">
                             Release Yellow Slot
                         </button>
-                        <span className="text-xs text-muted-foreground">Keeps replacement entitlement open</span>
                     </form>
                 </div>
             )}
