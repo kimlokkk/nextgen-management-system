@@ -50,11 +50,12 @@ export default async function StudentsPage() {
                     className="grid gap-4 md:grid-cols-2"
                 >
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="create-full_name" className="mb-2 block text-sm font-medium">
                             Student Name *
                         </label>
 
                         <input
+                            id="create-full_name"
                             name="full_name"
                             required
                             className="h-10 w-full rounded-lg border bg-background px-3"
@@ -63,23 +64,25 @@ export default async function StudentsPage() {
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="create-date_of_birth" className="mb-2 block text-sm font-medium">
                             Date of Birth
                         </label>
 
                         <input
                             type="date"
+                            id="create-date_of_birth"
                             name="date_of_birth"
                             className="h-10 w-full rounded-lg border bg-background px-3"
                         />
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="create-parent_id" className="mb-2 block text-sm font-medium">
                             Primary Parent / Guardian *
                         </label>
 
                         <select
+                            id="create-parent_id"
                             name="parent_id"
                             required
                             className="h-10 w-full rounded-lg border bg-background px-3"
@@ -101,11 +104,12 @@ export default async function StudentsPage() {
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="create-relationship" className="mb-2 block text-sm font-medium">
                             Relationship
                         </label>
 
                         <select
+                            id="create-relationship"
                             name="relationship"
                             className="h-10 w-full rounded-lg border bg-background px-3"
                             defaultValue=""
@@ -129,11 +133,12 @@ export default async function StudentsPage() {
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="create-laptop_type" className="mb-2 block text-sm font-medium">
                             Laptop
                         </label>
 
                         <select
+                            id="create-laptop_type"
                             name="laptop_type"
                             className="h-10 w-full rounded-lg border bg-background px-3"
                             defaultValue=""
@@ -153,11 +158,12 @@ export default async function StudentsPage() {
                     </div>
 
                     <div className="md:col-span-2">
-                        <label className="mb-2 block text-sm font-medium">
+                        <label htmlFor="create-notes" className="mb-2 block text-sm font-medium">
                             Notes
                         </label>
 
                         <textarea
+                            id="create-notes"
                             name="notes"
                             rows={3}
                             className="w-full rounded-lg border bg-background px-3 py-2"
