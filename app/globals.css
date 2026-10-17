@@ -953,17 +953,44 @@
     cursor: pointer;
   }
 
-  /* Old server pages contain tables inside border/overflow-hidden containers.
-     Allow horizontal scrolling without clipping the last action column. */
-  .nextgen-app div:has(> table) {
+  /*
+   * Tables use a dedicated scroll viewport. In half-width desktop windows,
+   * the viewport keeps its own width instead of expanding the page.
+   * Avoid global :has(> table) overflow rules: they can conflict with the
+   * rounded/overflow-hidden cards on schedule and housekeeping pages.
+   */
+  .nextgen-app .table-scroll-area,
+  .nextgen-app .table-scroll-viewport {
+    min-width: 0;
     max-width: 100%;
+  }
+
+  .nextgen-app .table-scroll-viewport {
     overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+
+  .nextgen-app .table-scroll-viewport::-webkit-scrollbar {
+    height: 9px;
+  }
+
+  .nextgen-app .table-scroll-viewport::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--color-border);
+  }
+
+  .nextgen-app .table-scroll-viewport > table {
+    width: 100%;
+    min-width: 52rem;
+    border-collapse: collapse;
   }
 
   .nextgen-app table {
     width: 100%;
-    min-width: 42rem;
     border-collapse: collapse;
   }
 
