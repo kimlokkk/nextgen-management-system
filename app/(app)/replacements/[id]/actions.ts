@@ -91,6 +91,9 @@ export async function cancelReplacement(formData: FormData) {
     if (parsed.data.mode === "cancel" && formData.get("confirm_cancel") !== "on") {
         throw new Error("Please confirm cancellation")
     }
+    if (parsed.data.mode === "release" && formData.get("confirm_release") !== "on") {
+        throw new Error("Please confirm release of this yellow slot")
+    }
     const supabase = await replacementClient()
     const { obligation_id, mode, reason } = parsed.data
     const { error } = await supabase.rpc("cancel_replacement", {
@@ -107,6 +110,9 @@ export async function completeReplacement(formData: FormData) {
         obligation_id: formData.get("obligation_id"),
     })
     if (!parsed.success) throw new Error("Invalid attendance request")
+    if (formData.get("confirm_attendance") !== "on") {
+        throw new Error("Please confirm the student attended")
+    }
     const supabase = await replacementClient()
     const { error } = await supabase.rpc("complete_replacement", {
         p_obligation_id: parsed.data.obligation_id,
