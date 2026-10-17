@@ -185,73 +185,7 @@ export default async function ReschedulesPage() {
     // PAGE
     // =====================================================
 
-    return (
-        <div className="space-y-8">
-            <div>
-                <p className="text-sm text-muted-foreground">
-                    Scheduling
-                </p>
-
-                <h1 className="mt-1 text-3xl font-bold">
-                    Reschedule Queue
-                </h1>
-
-                <p className="mt-2 text-muted-foreground">
-                    Track open, scheduled, completed and cancelled reschedules.
-                </p>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border bg-background">
-                <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                        <tr className="border-b">
-                            <th className="px-5 py-3 text-left">
-                                Student
-                            </th>
-
-                            <th className="px-5 py-3 text-left">
-                                Original Class
-                            </th>
-
-                            <th className="px-5 py-3 text-left">
-                                Programme
-                            </th>
-
-                            <th className="px-5 py-3 text-left">
-                                Branch
-                            </th>
-
-                            <th className="px-5 py-3 text-left">
-                                Status
-                            </th>
-
-                            <th className="px-5 py-3 text-right">
-                                Action
-                            </th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {rows.length > 0 ? (
-                            rows.map((obligation) => {
-                                const student =
-                                    studentMap.get(
-                                        obligation.student_id
-                                    )
-
-                                const sourceBooking =
-                                    sourceBookingMap.get(
-                                        obligation.source_booking_id
-                                    )
-
-                                const classSession =
-                                    sourceBooking
-                                        ? classSessionMap.get(
-                                            sourceBooking.class_session_id
-                                        )
-                                        : null
-
-                                const targetBookingIds = rows
+    const targetBookingIds = rows
         .map((item) => item.target_booking_id)
         .filter((id): id is string => !!id)
 
