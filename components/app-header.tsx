@@ -1,4 +1,5 @@
 import { LogoutButton } from "@/components/logout-button"
+import { ThemeSwitcher } from "@/components/theme-switcher"
 
 type AppHeaderProps = {
     email: string
@@ -27,7 +28,10 @@ export function AppHeader({
                 </p>
             </div>
 
-            <LogoutButton />
+            <div className="flex shrink-0 items-center gap-2">
+                <ThemeSwitcher />
+                <LogoutButton />
+            </div>
         </header>
     )
 }
