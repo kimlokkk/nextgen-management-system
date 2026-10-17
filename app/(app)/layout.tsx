@@ -25,7 +25,7 @@ export default async function AppLayout({
         .single()
 
     return (
-        <div className="nextgen-app min-h-screen min-w-0 bg-muted/25">
+        <div className="nextgen-app min-h-screen min-w-0 bg-background">
             <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg">Skip to content</a>
             <AppSidebar />
 
