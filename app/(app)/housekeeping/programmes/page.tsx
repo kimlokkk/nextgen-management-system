@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import { createClient } from "@/lib/supabase/server"
 import { createProgramme, toggleProgramme } from "./actions"
 
@@ -58,6 +59,7 @@ export default async function ProgrammesPage() {
             </div>
 
             <div className="overflow-hidden rounded-xl border bg-background">
+                <TableScrollArea label="Programmes">
                 <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                         <tr className="border-b">
@@ -114,6 +116,7 @@ export default async function ProgrammesPage() {
                         ))}
                     </tbody>
                 </table>
+                </TableScrollArea>
             </div>
         </div>
     )

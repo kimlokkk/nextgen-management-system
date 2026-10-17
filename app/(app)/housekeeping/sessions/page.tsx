@@ -1,3 +1,5 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { updateSessionCapacity } from "./actions"
 
@@ -64,19 +66,24 @@ export default async function SessionSetupPage() {
         <div className="space-y-8">
             <div>
                 <p className="text-sm text-muted-foreground">
-                    Housekeeping
+                    Setup
                 </p>
 
-                <h1 className="mt-1 text-3xl font-bold">
-                    Session Setup
+                <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+                    Class settings
                 </h1>
 
-                <p className="mt-2 text-muted-foreground">
-                    Configure regular and replacement capacity for each class session.
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    Configure regular and yellow-seat capacity for your weekly class templates.
                 </p>
+
+                <Link href="/sessions" className="ui-secondary-action mt-4">
+                    View session directory
+                </Link>
             </div>
 
             <div className="overflow-hidden rounded-xl border bg-background">
+                <TableScrollArea label="Class settings">
                 <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                         <tr className="border-b">
@@ -154,6 +161,7 @@ export default async function SessionSetupPage() {
                         ))}
                     </tbody>
                 </table>
+                </TableScrollArea>
             </div>
         </div>
     )
