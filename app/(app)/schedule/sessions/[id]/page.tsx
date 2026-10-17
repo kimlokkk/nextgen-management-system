@@ -1,4 +1,6 @@
-import { TableScrollArea } from "@/components/table-scroll-area"
+import { AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, Clock3, GraduationCap, UsersRound } from "lucide-react"
+import { SessionRoster, RosterActionSubmit, type SessionRosterEntry } from "@/components/session-roster"
+import { ScheduleStatus } from "@/components/schedule-workspace"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
@@ -342,419 +344,275 @@ export default async function ScheduleSessionPage({
         ...new Set(warnings),
     ]
 
+    // All permission and state gates below mirror the original roster forms.
+    // Keep actions on the server and pass only rendered slots to the client
+    // so mobile and desktop share exactly the same business conditions.
+    const rosterEntries: SessionRosterEntry[] = bookings.map((booking) => {
+        const student = studentMap.get(booking.student_id)
+        const enrollment = booking.enrollment_id ? enrollmentMap.get(booking.enrollment_id) : null
+        const obligation = obligationMap.get(booking.id)
+        const hasActiveObligation = !!obligation && obligation.status !== "cancelled"
+        const targetObligation = targetObligationMap.get(booking.id)
+        const isRegular = booking.booking_type === "regular"
+        const isMakeup = ["reschedule", "replacement"].includes(booking.booking_type)
+        const regularBlocked = isRegular
+            && obligation?.obligation_type === "reschedule"
+            && obligation.status !== "cancelled"
+        const canAttend = canTakeAttendance
+            && ["upcoming", "present", "absent"].includes(booking.attendance_status)
+            && ((isRegular && !regularBlocked)
+                || (isMakeup && targetObligation?.status === "scheduled"))
+        const presentBlocked = isRegular
+            && obligation?.obligation_type === "replacement"
+            && ["open", "scheduled", "completed"].includes(obligation.status)
+        const priorRescheduleCancelled = cancelledRescheduleSources.has(booking.id)
+
+        const canConfirmAbsence = hasActiveObligation
+            && obligation?.obligation_type === "replacement"
+            && ["open", "scheduled", "completed"].includes(obligation.status)
+            && isRegular
+            && booking.attendance_status === "upcoming"
+            && sessionEnded && batch?.status === "locked" && session.status === "scheduled"
+
+        const canManageRegular = !hasActiveObligation
+            && isRegular
+            && ["upcoming", "absent"].includes(booking.attendance_status)
+            && batch?.status === "locked" && session.status === "scheduled"
+
+        const canReschedule = canManageRegular && booking.attendance_status === "upcoming"
+            && !sessionEnded
+            && (!obligation || obligation.status === "cancelled" || obligation.obligation_type === "reschedule")
+
+        const canReplace = canManageRegular
+            && (!obligation || obligation.status === "cancelled" || obligation.obligation_type === "replacement")
+            && (sessionEnded || booking.attendance_status === "upcoming")
+
+        const attendanceActions = canAttend ? (
+            <>
+                {booking.attendance_status !== "present" && !presentBlocked && (
+                    <form action={recordAttendance}>
+                        <input type="hidden" name="session_id" value={session.id} />
+                        <input type="hidden" name="booking_id" value={booking.id} />
+                        <input type="hidden" name="attendance" value="present" />
+                        <RosterActionSubmit label="Present" tone="present" />
+                    </form>
+                )}
+                {booking.attendance_status !== "absent" && (
+                    <form action={recordAttendance}>
+                        <input type="hidden" name="session_id" value={session.id} />
+                        <input type="hidden" name="booking_id" value={booking.id} />
+                        <input type="hidden" name="attendance" value="absent" />
+                        <RosterActionSubmit label="Absent" tone="absent" />
+                    </form>
+                )}
+                {presentBlocked && (
+                    <span className="text-xs text-muted-foreground">Replacement already initiated</span>
+                )}
+                {isMakeup && booking.attendance_status === "absent" && (
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Needs follow-up</span>
+                )}
+            </>
+        ) : (
+            <span className="text-xs text-muted-foreground">
+                {booking.attendance_status === "present" ? "Recorded"
+                    : booking.attendance_status === "absent" && isMakeup ? "Needs follow-up" : "—"}
+            </span>
+        )
+
+        const historyNote = priorRescheduleCancelled ? (
+            <span className="text-xs leading-5 text-muted-foreground">
+                Previous reschedule cancelled · history retained
+            </span>
+        ) : null
+
+        const followupActions = hasActiveObligation ? (
+            <div className="flex flex-col items-start gap-2">
+                <span className="text-xs font-semibold capitalize text-foreground">
+                    {obligation.obligation_type} · {obligation.status}
+                    {obligation.obligation_type === "replacement"
+                        && booking.attendance_status === "upcoming" && " · planned"}
+                </span>
+                {historyNote}
+                {canConfirmAbsence && (
+                    <form action={initiateReplacement}>
+                        <input type="hidden" name="booking_id" value={booking.id} />
+                        <input type="hidden" name="session_id" value={session.id} />
+                        <input type="hidden" name="mode" value="absent" />
+                        <RosterActionSubmit label="Confirm absence" tone="warning" />
+                    </form>
+                )}
+            </div>
+        ) : canManageRegular ? (
+            <div className="flex flex-wrap items-center gap-2">
+                {canReschedule && (
+                    <form action={markForReschedule}>
+                        <input type="hidden" name="booking_id" value={booking.id} />
+                        <input type="hidden" name="session_id" value={session.id} />
+                        <RosterActionSubmit label="Mark reschedule" />
+                    </form>
+                )}
+                {canReplace && (
+                    <form action={initiateReplacement}>
+                        <input type="hidden" name="booking_id" value={booking.id} />
+                        <input type="hidden" name="session_id" value={session.id} />
+                        <input type="hidden" name="mode" value={sessionEnded ? "absent" : "planned"} />
+                        <RosterActionSubmit
+                            label={obligation?.obligation_type === "replacement" && obligation.status === "cancelled"
+                                ? "Reopen replacement" : sessionEnded
+                                    ? "Mark absent / replacement" : "Plan replacement"}
+                            tone="secondary"
+                        />
+                    </form>
+                )}
+                {historyNote}
+            </div>
+        ) : null
+
+        return {
+            id: booking.id,
+            student: student?.full_name ?? "Student unavailable",
+            type: booking.booking_type,
+            laptop: student?.laptop_type ?? "Not specified",
+            enrollment: enrollment?.status ?? "—",
+            attendance: booking.attendance_status,
+            attendanceActions,
+            followupActions,
+        }
+    })
+
+    const recorded = presentCount + absentCount
+    const attendanceRate = recorded > 0 ? Math.round(presentCount / recorded * 100) : 0
+    const totalEligible = attendanceEligible.length
+
     return (
-        <div className="space-y-8">
-
-            {/* HEADER */}
-
-            <div>
-                <Link
-                    href={`/schedule?batch=${session.schedule_batch_id}`}
-                    className="ui-action-link text-muted-foreground"
-                >
-                    ← Back to monthly schedule
+        <div className="min-w-0 space-y-6">
+            <header>
+                <Link href={`/schedule?batch=${session.schedule_batch_id}`}
+                    className="ui-action-link -ml-2 text-muted-foreground">
+                    <ArrowLeft className="size-4" aria-hidden="true" />
+                    Back to monthly schedule
                 </Link>
-
-                <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <p className="text-sm text-muted-foreground">
-                            W{session.week_number} · {session.class_date}
+                <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium text-primary">
+                            Week {session.week_number} · {new Intl.DateTimeFormat("en-MY", {
+                                timeZone: "UTC", weekday: "long", day: "numeric", month: "short", year: "numeric",
+                            }).format(new Date(`${session.class_date}T00:00:00Z`))}
                         </p>
-
-                        <h1 className="mt-1 text-3xl font-bold">
+                        <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
                             {programme?.name ?? "Class Session"}
                         </h1>
-
-                        <p className="mt-2 text-muted-foreground">
-                            {branch?.name ?? "-"}
-                            {" · "}
-                            {session.start_time.slice(0, 5)}
-                            {" - "}
-                            {session.end_time.slice(0, 5)}
+                        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                            <GraduationCap className="size-4 text-primary" aria-hidden="true" />
+                            {branch?.name ?? "Branch unavailable"}
+                            <span aria-hidden="true">·</span>
+                            {session.start_time.slice(0, 5)}–{session.end_time.slice(0, 5)}
                         </p>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <ScheduleStatus status={batch?.status ?? "unknown"} />
+                        {session.status !== "scheduled" && (
+                            <span className="rounded-full border bg-muted px-2.5 py-1 text-xs font-medium capitalize">
+                                Class {session.status}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </header>
 
-                    <span className="rounded-full border px-3 py-1 text-xs font-medium uppercase">
-                        {batch?.status ?? session.status}
+            <section aria-label="Class capacity" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {[
+                    { label: "Regular seats", used: regularBookings.length, max: session.regular_capacity, icon: UsersRound },
+                    { label: "Yellow seats", used: replacementBookings.length, max: session.replacement_capacity, icon: CalendarClock },
+                ].map((item) => (
+                    <div key={item.label} className="min-w-0 rounded-xl border bg-card p-4 shadow-sm shadow-primary/5 sm:p-5">
+                        <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <item.icon className="size-4.5" aria-hidden="true" />
+                        </span>
+                        <p className="mt-3 text-xs font-medium text-muted-foreground">{item.label}</p>
+                        <p className={`mt-1 text-2xl font-semibold tabular-nums ${item.used > item.max ? "text-destructive" : ""}`}>
+                            {item.used} / {item.max}
+                        </p>
+                    </div>
+                ))}
+                <div className="col-span-2 min-w-0 rounded-xl border bg-card p-4 sm:col-span-1 sm:p-5">
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <CalendarClock className="size-4.5" aria-hidden="true" />
                     </span>
+                    <p className="mt-3 text-xs font-medium text-muted-foreground">Rescheduled</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums">{rescheduleBookings.length}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Included in regular seats</p>
                 </div>
-            </div>
-
-            {/* CAPACITY */}
-
-            <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border bg-background p-5">
-                    <p className="text-sm text-muted-foreground">
-                        Regular seats
-                    </p>
-
-                    <p className="mt-2 text-2xl font-bold">
-                        {regularBookings.length}
-                        {" / "}
-                        {session.regular_capacity}
-                    </p>
-                </div>
-
-                <div className="rounded-xl border bg-background p-5">
-                    <p className="text-sm text-muted-foreground">
-                        Replacement
-                    </p>
-
-                    <p className="mt-2 text-2xl font-bold">
-                        {replacementBookings.length}
-                        {" / "}
-                        {session.replacement_capacity}
-                    </p>
-                </div>
-
-                <div className="rounded-xl border bg-background p-5">
-                    <p className="text-sm text-muted-foreground">
-                        Reschedule
-                    </p>
-
-                    <p className="mt-2 text-2xl font-bold">
-                        {rescheduleBookings.length}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        Included in regular seats
-                    </p>
-                </div>
-            </div>
-
-            {/* WARNINGS */}
+            </section>
 
             {uniqueWarnings.length > 0 && (
-                <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-5">
-                    <h2 className="font-semibold text-destructive">
-                        Schedule Warnings
-                    </h2>
-
-                    <ul className="mt-3 space-y-2 text-sm">
-                        {uniqueWarnings.map((warning) => (
-                            <li key={warning}>
-                                • {warning}
-                            </li>
-                        ))}
+                <section className="rounded-xl border border-destructive/35 bg-destructive/5 p-4 sm:p-5" aria-label="Schedule warnings">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle className="size-5 shrink-0 text-destructive" aria-hidden="true" />
+                        <h2 className="font-semibold text-destructive">Schedule warnings</h2>
+                    </div>
+                    <ul className="mt-3 space-y-2 text-sm leading-6">
+                        {uniqueWarnings.map((warning) => <li key={warning}>• {warning}</li>)}
                     </ul>
-                </div>
+                </section>
             )}
 
-            {uniqueWarnings.length === 0 && (
-                <div className="rounded-xl border bg-background p-5">
-                    <p className="text-sm font-medium">
-                        No conflicts detected.
-                    </p>
-                </div>
-            )}
-
-            {/* ATTENDANCE OVERVIEW */}
-
-            <div className="rounded-xl border bg-background p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+            <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Class attendance overview">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h2 className="font-semibold">Class Attendance</h2>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {canTakeAttendance
-                                ? "Class ended. Record actual attendance below."
-                                : "Attendance opens after the class ends in Malaysia time."}
+                        <div className="flex items-center gap-2">
+                            {canTakeAttendance ? <CheckCircle2 className="size-5 text-primary" aria-hidden="true" />
+                                : <Clock3 className="size-5 text-muted-foreground" aria-hidden="true" />}
+                            <h2 className="font-semibold">Class attendance</h2>
+                        </div>
+                        <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+                            {canTakeAttendance ? "This class has ended. Record each eligible student's attendance below."
+                                : "Attendance requires a scheduled class in a locked month and opens after class end (Malaysia time)."}
                         </p>
                     </div>
-                    <span className="rounded-full border px-3 py-1 text-xs font-medium">
-                        {canTakeAttendance ? "Ready for attendance" : "Not yet open"}
+                    <span className={`rounded-full border px-3 py-1.5 text-xs font-medium ${canTakeAttendance
+                        ? "border-primary/25 bg-primary/10 text-primary" : "border-border bg-muted text-muted-foreground"}`}>
+                        {canTakeAttendance ? "Ready to mark" : "Not yet open"}
                     </span>
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                    <div className="rounded-lg bg-muted/40 p-3">
-                        <p className="text-xs text-muted-foreground">Present</p>
-                        <p className="mt-1 text-xl font-semibold">{presentCount}</p>
+
+                <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <p className="text-xs font-medium text-muted-foreground">Attendance recorded</p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums">{recorded} / {totalEligible}</p>
                     </div>
-                    <div className="rounded-lg bg-muted/40 p-3">
-                        <p className="text-xs text-muted-foreground">Absent</p>
-                        <p className="mt-1 text-xl font-semibold">{absentCount}</p>
-                    </div>
-                    <div className="rounded-lg bg-muted/40 p-3">
-                        <p className="text-xs text-muted-foreground">Unmarked</p>
-                        <p className="mt-1 text-xl font-semibold">{upcomingCount}</p>
+                    <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Present of marked</p>
+                        <p className="mt-1 text-xl font-semibold tabular-nums">{recorded > 0 ? `${attendanceRate}%` : "—"}</p>
                     </div>
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground">
-                    Rescheduled original bookings and cancelled seats are excluded.
-                    Marking a makeup class Present completes its obligation.
-                    Absent makeup bookings require admin follow-up.
+                <div role="progressbar" aria-label="Attendance recording progress"
+                    aria-valuenow={totalEligible ? Math.round(recorded / totalEligible * 100) : 0}
+                    aria-valuemin={0} aria-valuemax={100}
+                    className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${totalEligible ? Math.round(recorded / totalEligible * 100) : 0}%` }} />
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                    {[
+                        { label: "Present", count: presentCount, color: "text-emerald-700 dark:text-emerald-300" },
+                        { label: "Absent", count: absentCount, color: "text-amber-700 dark:text-amber-300" },
+                        { label: "Unmarked", count: upcomingCount, color: "text-sky-700 dark:text-sky-300" },
+                    ].map((item) => (
+                        <div key={item.label} className="rounded-lg bg-muted/40 p-3 sm:p-4">
+                            <p className="text-xs text-muted-foreground">{item.label}</p>
+                            <p className={`mt-1 text-xl font-semibold tabular-nums sm:text-2xl ${item.color}`}>{item.count}</p>
+                        </div>
+                    ))}
+                </div>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                    Rescheduled originals and cancelled seats are excluded. Marking a makeup class Present
+                    completes its obligation. Absent makeup bookings require admin follow-up.
                 </p>
-            </div>
+            </section>
 
-            {/* STUDENTS */}
-
-            <div className="overflow-hidden rounded-xl border bg-background">
-                <div className="border-b px-6 py-4">
-                    <h2 className="font-semibold">
-                        Students
-                    </h2>
-
-                    <p className="text-sm text-muted-foreground">
-                        {bookings.length} students assigned
-                    </p>
-                </div>
-
-                <div className="min-w-0 max-w-full">
-                    <TableScrollArea label="Class roster">
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                            <tr className="border-b">
-                                <th className="px-6 py-3 text-left">
-                                    Student
-                                </th>
-
-                                <th className="px-6 py-3 text-left">
-                                    Type
-                                </th>
-
-                                <th className="px-6 py-3 text-left">
-                                    Laptop
-                                </th>
-
-                                <th className="px-6 py-3 text-left">
-                                    Enrollment
-                                </th>
-
-                                <th className="px-6 py-3 text-left">
-                                    Attendance
-                                </th>
-
-                                <th className="px-6 py-3 text-left">
-                                    Mark Attendance
-                                </th>
-                                <th className="px-6 py-3 text-left">
-                                    Action
-                                </th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {bookings.length ? (
-                                bookings.map((booking) => {
-                                    const student =
-                                        studentMap.get(
-                                            booking.student_id
-                                        )
-
-                                    const enrollment =
-                                        booking.enrollment_id
-                                            ? enrollmentMap.get(
-                                                booking.enrollment_id
-                                            )
-                                            : null
-
-                                    const obligation =
-                                        obligationMap.get(booking.id)
-
-                                    const hasActiveObligation =
-                                        obligation &&
-                                        obligation.status !== "cancelled"
-
-                                    const targetObligation = targetObligationMap.get(booking.id)
-                                    const isRegular = booking.booking_type === "regular"
-                                    const isMakeup = ["reschedule", "replacement"].includes(booking.booking_type)
-                                    const regularBlocked = isRegular
-                                        && obligation?.obligation_type === "reschedule"
-                                        && obligation.status !== "cancelled"
-                                    const canAttend = canTakeAttendance
-                                        && ["upcoming", "present", "absent"].includes(booking.attendance_status)
-                                        && (
-                                            (isRegular && !regularBlocked)
-                                            || (isMakeup && targetObligation?.status === "scheduled")
-                                        )
-                                    const presentBlocked = isRegular
-                                        && obligation?.obligation_type === "replacement"
-                                        && ["open", "scheduled", "completed"].includes(obligation.status)
-
-                                    return (
-                                        <tr
-                                            key={booking.id}
-                                            className="border-b last:border-0"
-                                        >
-                                            <td className="px-6 py-4 font-medium">
-                                                {student?.full_name ?? "-"}
-                                            </td>
-
-                                            <td className="px-6 py-4 capitalize">
-                                                {booking.booking_type}
-                                            </td>
-
-                                            <td className="px-6 py-4 capitalize">
-                                                {student?.laptop_type ?? "-"}
-                                            </td>
-
-                                            <td className="px-6 py-4 capitalize">
-                                                {enrollment?.status ?? "-"}
-                                            </td>
-
-                                            <td className="px-6 py-4 capitalize">
-                                                {booking.attendance_status.replaceAll(
-                                                    "_",
-                                                    " "
-                                                )}
-                                            </td>
-
-                                            <td className="px-6 py-4">
-                                                {canAttend ? (
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {booking.attendance_status !== "present" && !presentBlocked && (
-                                                            <form action={recordAttendance}>
-                                                                <input type="hidden" name="session_id" value={session.id} />
-                                                                <input type="hidden" name="booking_id" value={booking.id} />
-                                                                <input type="hidden" name="attendance" value="present" />
-                                                                <button type="submit"
-                                                                    className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                                                                    Present
-                                                                </button>
-                                                            </form>
-                                                        )}
-                                                        {booking.attendance_status !== "absent" && (
-                                                            <form action={recordAttendance}>
-                                                                <input type="hidden" name="session_id" value={session.id} />
-                                                                <input type="hidden" name="booking_id" value={booking.id} />
-                                                                <input type="hidden" name="attendance" value="absent" />
-                                                                <button type="submit"
-                                                                    className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                                                                    Absent
-                                                                </button>
-                                                            </form>
-                                                        )}
-                                                        {presentBlocked && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Replacement already initiated
-                                                            </span>
-                                                        )}
-                                                        {isMakeup && booking.attendance_status === "absent" && (
-                                                            <span className="text-xs text-amber-700">
-                                                                Needs follow-up
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {booking.attendance_status === "present"
-                                                            ? "Recorded"
-                                                            : booking.attendance_status === "absent"
-                                                                && isMakeup ? "Needs follow-up"
-                                                                : "—"}
-                                                    </span>
-                                                )}
-                                            </td>
-
-                                            <td className="px-6 py-4">
-                                                {hasActiveObligation ? (
-                                                    <div className="flex flex-col items-start gap-2">
-                                                        <span className="text-sm font-medium capitalize">
-                                                            {obligation.obligation_type}
-                                                            {" · "}
-                                                            {obligation.status}
-                                                            {obligation.obligation_type === "replacement" &&
-                                                                booking.attendance_status === "upcoming" &&
-                                                                " · planned"}
-                                                        </span>
-
-                                                        {cancelledRescheduleSources.has(booking.id) && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Previous reschedule cancelled · history retained
-                                                            </span>
-                                                        )}
-
-                                                        {obligation.obligation_type === "replacement" &&
-                                                            ["open", "scheduled", "completed"].includes(obligation.status) &&
-                                                            booking.booking_type === "regular" &&
-                                                            booking.attendance_status === "upcoming" &&
-                                                            sessionEnded &&
-                                                            batch?.status === "locked" &&
-                                                            session.status === "scheduled" && (
-                                                                <form action={initiateReplacement}>
-                                                                    <input type="hidden" name="booking_id" value={booking.id} />
-                                                                    <input type="hidden" name="session_id" value={session.id} />
-                                                                    <input type="hidden" name="mode" value="absent" />
-                                                                    <button
-                                                                        type="submit"
-                                                                        className="text-sm font-medium underline underline-offset-4"
-                                                                    >
-                                                                        Confirm Absence
-                                                                    </button>
-                                                                </form>
-                                                            )}
-                                                    </div>
-                                                ) : booking.booking_type === "regular" &&
-                                                    ["upcoming", "absent"].includes(booking.attendance_status) &&
-                                                    batch?.status === "locked" &&
-                                                    session.status === "scheduled" ? (
-                                                    <div className="flex flex-wrap items-center gap-3">
-                                                        {booking.attendance_status === "upcoming" &&
-                                                            !sessionEnded &&
-                                                            (!obligation || obligation.status === "cancelled" || obligation.obligation_type === "reschedule") && (
-                                                                <form action={markForReschedule}>
-                                                                    <input type="hidden" name="booking_id" value={booking.id} />
-                                                                    <input type="hidden" name="session_id" value={session.id} />
-                                                                    <button
-                                                                        type="submit"
-                                                                        className="text-sm font-medium underline underline-offset-4"
-                                                                    >
-                                                                        Mark Reschedule
-                                                                    </button>
-                                                                </form>
-                                                            )}
-
-                                                        {(!obligation || obligation.status === "cancelled" || obligation.obligation_type === "replacement") &&
-                                                            (sessionEnded || booking.attendance_status === "upcoming") && (
-                                                                <form action={initiateReplacement}>
-                                                                    <input type="hidden" name="booking_id" value={booking.id} />
-                                                                    <input type="hidden" name="session_id" value={session.id} />
-                                                                    <input
-                                                                        type="hidden"
-                                                                        name="mode"
-                                                                        value={sessionEnded ? "absent" : "planned"}
-                                                                    />
-                                                                    <button
-                                                                        type="submit"
-                                                                        className="text-sm font-medium underline underline-offset-4"
-                                                                    >
-                                                                        {obligation?.obligation_type === "replacement" && obligation.status === "cancelled"
-                                                                            ? "Reopen Replacement"
-                                                                            : sessionEnded
-                                                                                ? "Mark Absent / Replacement"
-                                                                                : "Plan Replacement"}
-                                                                    </button>
-                                                                </form>
-                                                            )}
-
-                                                        {cancelledRescheduleSources.has(booking.id) && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Previous reschedule cancelled · history retained
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        -
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    )
-                                })
-                            ) : (
-                                <tr>
-                                    <td
-                                        colSpan={7}
-                                        className="px-6 py-10 text-center text-muted-foreground"
-                                    >
-                                        No students assigned to this session.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                    </TableScrollArea>
-                </div>
-            </div>
+            <SessionRoster entries={rosterEntries} />
         </div>
     )
 }
