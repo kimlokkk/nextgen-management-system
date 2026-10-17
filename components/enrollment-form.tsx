@@ -208,7 +208,7 @@ export function EnrollmentForm({
             <div className="md:col-span-2">
                 <button
                     type="submit"
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                    className="ui-primary-action"
                 >
                     Add Enrollment
                 </button>
