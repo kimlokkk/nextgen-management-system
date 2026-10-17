@@ -235,12 +235,31 @@ export async function markForReschedule(
             "source_booking_id",
             booking.id
         )
+        .eq("obligation_type", "reschedule")
         .maybeSingle()
 
     if (existingError) {
         throw new Error(
             existingError.message
         )
+    }
+
+    // A previous cancelled replacement is historical and harmless.
+    // A new or active replacement must not coexist with a reschedule.
+    const { data: competingReplacement, error: competingError } = await supabase
+        .from("makeup_obligations")
+        .select("id")
+        .eq("source_booking_id", booking.id)
+        .eq("obligation_type", "replacement")
+        .in("status", ["open", "scheduled", "completed"])
+        .maybeSingle()
+
+    if (competingError) {
+        throw new Error(competingError.message)
+    }
+
+    if (competingReplacement) {
+        throw new Error("This booking already has an active replacement obligation")
     }
 
     let obligation: {
