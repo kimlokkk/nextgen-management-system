@@ -453,22 +453,36 @@ export default async function DashboardPage() {
             </div>
 
             <section className="rounded-xl border bg-background p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <ClipboardCheck className="size-5 text-muted-foreground" aria-hidden="true" />
-                            <h2 className="font-semibold">Attendance · {monthTitle(today)}</h2>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                            Locked classes that have already ended. Rescheduled originals and cancelled seats excluded.
+                <div>
+                    <div className="flex items-center gap-2">
+                        <ClipboardCheck className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <h2 className="font-semibold">Attendance · {monthTitle(today)}</h2>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        Finished, locked classes only. Rescheduled originals and cancelled seats excluded.
+                    </p>
+                </div>
+                <div className="mt-5 flex items-end justify-between gap-4">
+                    <div className="min-w-0">
+                        <p className="text-xs font-medium text-muted-foreground">Attendance rate</p>
+                        <p className="mt-1 text-3xl font-semibold leading-none tracking-tight tabular-nums sm:text-4xl">
+                            {recorded ? `${attendanceRate}%` : "—"}
                         </p>
                     </div>
-                    <div className="text-right">
-                        <p className="text-2xl font-semibold tabular-nums">{attendanceRate}%</p>
-                        <p className="text-xs text-muted-foreground">Present of marked bookings</p>
-                    </div>
+                    <p className="pb-0.5 text-right text-xs text-muted-foreground">
+                        {recorded
+                            ? `${totalPresent} present of ${recorded} marked`
+                            : "No attendance marked yet"}
+                    </p>
                 </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                    role="progressbar"
+                    aria-label="Attendance rate"
+                    aria-valuenow={recorded ? attendanceRate : 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    className="mt-3 h-2 overflow-hidden rounded-full bg-muted"
+                >
                     <div className="h-full rounded-full bg-foreground transition-all"
                         style={{ width: `${attendanceRate}%` }} />
                 </div>
