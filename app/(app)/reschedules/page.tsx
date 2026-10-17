@@ -21,7 +21,7 @@ export default async function ReschedulesPage() {
       created_at
     `)
         .eq("obligation_type", "reschedule")
-        .in("status", ["open", "scheduled"])
+        .in("status", ["open", "scheduled", "completed", "cancelled"])
         .order("created_at", {
             ascending: true,
         })
@@ -195,7 +195,7 @@ export default async function ReschedulesPage() {
                 </h1>
 
                 <p className="mt-2 text-muted-foreground">
-                    Students waiting for a new class slot.
+                    Track open, scheduled, completed and cancelled reschedules.
                 </p>
             </div>
 
@@ -336,7 +336,7 @@ export default async function ReschedulesPage() {
                                     colSpan={6}
                                     className="px-5 py-10 text-center text-muted-foreground"
                                 >
-                                    No open reschedules.
+                                    No reschedule records yet.
                                 </td>
                             </tr>
                         )}
