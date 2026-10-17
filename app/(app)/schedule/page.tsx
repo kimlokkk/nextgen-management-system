@@ -115,7 +115,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
         </div>
     }
 
-    const bookingsByClass = new Map<string, NonNullable<typeof bookingResult.data>>()
+    const bookingsByClass = new Map<string, { booking_type: string; attendance_status: string }[]>()
     for (const booking of bookingResult.data ?? []) {
         const current = bookingsByClass.get(booking.class_session_id) ?? []
         current.push(booking)
