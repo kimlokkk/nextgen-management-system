@@ -221,3 +221,32 @@ or migration, no additional package. Need manual browser QA for:
 - Locked, approved, draft and validation-error states.
 - Half-width desktop, iPhone, dark/light theme and class review links.
 - Correct regular/yellow occupancy on a real assignment.
+
+
+## Wave 4 — Session Detail + Attendance UI (2026-10-18)
+
+- Rebuilt the class detail layout around the admin's decision path:
+  **class identity/status → seat usage → warnings → attendance progress →
+  searchable student roster with row-specific actions**.
+- Capacity cards show actual **regular** and **yellow/replacement** usage,
+  plus reschedules (explicitly noted as included in regular usage), using the
+  existing policy counters. Over-capacity numbers remain prominently red.
+- Class attendance panel displays recorded / eligible, Present, Absent,
+  Unmarked and recording progress. A separate present-of-marked percentage is
+  shown only when records have been marked (otherwise an em dash).
+  Original reschedules and cancelled bookings remain excluded from these
+  attendance totals.
+- Added `components/session-roster.tsx` with searchable student entries,
+  attendance-state filters, booking-type filter, stacked mobile cards,
+  half-width-friendly desktop table and semantic attendance colors. Real actions
+  and history remain available inside each row; long tables are not required on
+  phones.
+- Form submit feedback shows a per-action spinner and prevents rapid duplicate
+  submits. Buttons for Present, Absent, Confirm Absence, Mark Reschedule,
+  Plan Replacement, Reopen Replacement and Mark Absent/Replacement are rendered
+  by the server page using **the exact existing eligibility conditions**.
+- No edits to `app/(app)/schedule/sessions/[id]/actions.ts`, session policy,
+  Supabase schema, migrations or scheduling/attendance business rules.
+- Browser QA required on locked past classes, future/unlocked sessions,
+  replacement/reschedule obligation variants (especially cancelled/reopened),
+  desktop half-width, iPhone cards, keyboard forms and dark mode.
