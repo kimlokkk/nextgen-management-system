@@ -78,38 +78,7 @@ export default async function ReplacementsPage() {
     const branches = new Map((branchResult.data ?? []).map((item) => [item.id, item.name]))
     const programmes = new Map((programmeResult.data ?? []).map((item) => [item.id, item.name]))
 
-    return (
-        <div className="space-y-6">
-            <div>
-                <p className="text-sm text-muted-foreground">Scheduling</p>
-                <h1 className="mt-1 text-3xl font-bold">Replacement Queue</h1>
-                <p className="mt-2 text-muted-foreground">
-                    View open, scheduled, completed and cancelled replacements.
-                    Assignments may cross months and can precede the original class date.
-                </p>
-            </div>
-
-            <div className="overflow-x-auto rounded-xl border bg-background">
-                <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                        <tr className="border-b">
-                            <th className="px-5 py-3 text-left">Student</th>
-                            <th className="px-5 py-3 text-left">Original Class</th>
-                            <th className="px-5 py-3 text-left">Branch / Programme</th>
-                            <th className="px-5 py-3 text-left">Absence</th>
-                            <th className="px-5 py-3 text-left">Status</th>
-                            <th className="px-5 py-3 text-left">Assignment</th>
-                            <th className="px-5 py-3 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows.map((item) => {
-                            const source = sources.get(item.source_booking_id)
-                            const original = source ? classMap.get(source.class_session_id) : null
-                            const target = item.target_booking_id ? targets.get(item.target_booking_id) : null
-                            const assigned = target ? classMap.get(target.class_session_id) : null
-
-                            const entries: QueueEntry[] = rows.map((item) => {
+    const entries: QueueEntry[] = rows.map((item) => {
         const source = sources.get(item.source_booking_id)
         const original = source ? classMap.get(source.class_session_id) : null
         const target = item.target_booking_id ? targets.get(item.target_booking_id) : null
