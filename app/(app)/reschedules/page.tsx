@@ -314,14 +314,14 @@ export default async function ReschedulesPage() {
                                                 "open" ? (
                                                 <Link
                                                     href={`/reschedules/${obligation.id}`}
-                                                    className="font-medium underline underline-offset-4"
+                                                    className="ui-action-link"
                                                 >
                                                     Find New Slot
                                                 </Link>
                                             ) : (
                                                 <Link
                                                     href={`/reschedules/${obligation.id}`}
-                                                    className="font-medium underline underline-offset-4"
+                                                    className="ui-action-link"
                                                 >
                                                     View
                                                 </Link>
