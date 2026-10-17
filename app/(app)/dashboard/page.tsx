@@ -331,22 +331,24 @@ export default async function DashboardPage() {
                     { label: "Open replacements", value: number(replacementCountResult.count), href: "/replacements", icon: CalendarDays, note: "Awaiting yellow slot" },
                 ].map((item) => (
                     <Link key={item.label} href={item.href}
-                        className="ui-interactive-card group rounded-xl border bg-background p-5">
+                        className="ui-interactive-card group rounded-xl border bg-card p-5 shadow-sm shadow-primary/5">
                         <div className="flex items-center justify-between">
                             <p className="text-sm text-muted-foreground">{item.label}</p>
-                            <item.icon className="size-5 text-muted-foreground" aria-hidden="true" />
+                            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
+                                <item.icon className="size-5" aria-hidden="true" />
+                            </span>
                         </div>
                         <p className="mt-3 text-3xl font-semibold tabular-nums">{item.value}</p>
                         <div className="mt-3 flex items-center justify-between gap-2">
                             <p className="text-xs text-muted-foreground">{item.note}</p>
-                            <ArrowRight className="size-4 text-muted-foreground group-hover:text-foreground" aria-hidden="true" />
+                            <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary" aria-hidden="true" />
                         </div>
                     </Link>
                 ))}
             </section>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-                <section className="min-w-0 overflow-hidden rounded-xl border bg-background">
+                <section className="min-w-0 overflow-hidden rounded-xl border bg-card">
                     <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
                         <div>
                             <h2 className="font-semibold">Needs attention</h2>
@@ -354,7 +356,7 @@ export default async function DashboardPage() {
                                 Open makeup requests and this month&apos;s unmarked attendance
                             </p>
                         </div>
-                        <span className="rounded-full border px-3 py-1 text-xs font-medium tabular-nums">
+                        <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800 tabular-nums dark:text-amber-300">
                             {outstanding} pending
                         </span>
                     </div>
@@ -394,7 +396,7 @@ export default async function DashboardPage() {
                         </div>
                     )}
                 </section>
-                <section className="min-w-0 overflow-hidden rounded-xl border bg-background">
+                <section className="min-w-0 overflow-hidden rounded-xl border bg-card">
                     <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
                         <div>
                             <h2 className="font-semibold">Classes this week</h2>
@@ -452,7 +454,7 @@ export default async function DashboardPage() {
 
             </div>
 
-            <section className="rounded-xl border bg-background p-5">
+            <section className="rounded-xl border bg-card p-5">
                 <div>
                     <div className="flex items-center gap-2">
                         <ClipboardCheck className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -483,7 +485,7 @@ export default async function DashboardPage() {
                     aria-valuemax={100}
                     className="mt-3 h-2 overflow-hidden rounded-full bg-muted"
                 >
-                    <div className="h-full rounded-full bg-foreground transition-all"
+                    <div className="h-full rounded-full bg-primary transition-all"
                         style={{ width: `${attendanceRate}%` }} />
                 </div>
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
