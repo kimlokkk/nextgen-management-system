@@ -110,7 +110,7 @@ export default async function DashboardPage() {
         supabase.from("makeup_obligations").select("id", { count: "exact", head: true })
             .eq("obligation_type", "reschedule").eq("status", "open"),
         supabase.from("makeup_obligations")
-            .select("id, student_id, obligation_type, created_at")
+            .select("id, student_id, source_booking_id, obligation_type, created_at")
             .eq("status", "open")
             .order("created_at", { ascending: true })
             .limit(12),
@@ -241,16 +241,47 @@ export default async function DashboardPage() {
         return <p className="text-destructive">Could not load admin actions. Please refresh.</p>
     }
 
+    const sourceIds = [...new Set(openObligations.map((item) => item.source_booking_id))]
+    const { data: sources, error: sourceError } = sourceIds.length
+        ? await supabase.from("student_bookings").select("id, class_session_id").in("id", sourceIds)
+        : { data: [], error: null }
+
+    if (sourceError) {
+        console.error("Dashboard source bookings unavailable:", sourceError.message)
+        return <p className="text-destructive">Could not load makeup class details. Please refresh.</p>
+    }
+
+    const sourceMap = new Map((sources ?? []).map((source) => [source.id, source.class_session_id]))
+    const makeupSessionIds = [...new Set((sources ?? []).map((source) => source.class_session_id))]
+    const { data: originalSessions, error: originalSessionError } = makeupSessionIds.length
+        ? await supabase.from("class_sessions")
+            .select("id, class_date, start_time, programme_id, branch_id")
+            .in("id", makeupSessionIds)
+        : { data: [], error: null }
+
+    if (originalSessionError) {
+        console.error("Dashboard original classes unavailable:", originalSessionError.message)
+        return <p className="text-destructive">Could not load original class details. Please refresh.</p>
+    }
+
+    const originalMap = new Map((originalSessions ?? []).map((session) => [session.id, session]))
     const studentMap = new Map((obligationStudents ?? []).map((student) => [student.id, student.full_name]))
-    const makeupActions = openObligations.map((obligation) => ({
+    const makeupActions = openObligations.map((obligation) => {
+        const sourceSessionId = sourceMap.get(obligation.source_booking_id)
+        const original = sourceSessionId ? originalMap.get(sourceSessionId) : undefined
+        return {
         id: obligation.id,
         href: obligation.obligation_type === "replacement"
             ? `/replacements/${obligation.id}`
             : `/reschedules/${obligation.id}`,
         title: obligation.obligation_type === "replacement" ? "Assign replacement" : "Assign reschedule",
         detail: studentMap.get(obligation.student_id) ?? "Student record",
+        context: original
+            ? `Original: ${displayDate(original.class_date)} · ${original.start_time.slice(0, 5)} · ${programmeMap.get(original.programme_id) ?? "Class"}`
+            : "Original class unavailable",
         kind: obligation.obligation_type === "replacement" ? "Replacement" : "Reschedule",
-    }))
+        }
+    })
 
     const attendanceActions = endedMonthSessions
         .filter((session) => (waitingBySession.get(session.id) ?? 0) > 0)
@@ -260,6 +291,7 @@ export default async function DashboardPage() {
             href: `/schedule/sessions/${session.id}`,
             title: "Mark attendance",
             detail: `${programmeMap.get(session.programme_id) ?? "Class"} · ${displayDate(session.class_date)} · ${waitingBySession.get(session.id)} unmarked`,
+            context: undefined as string | undefined,
             kind: "Attendance",
         }))
 
@@ -390,6 +422,11 @@ export default async function DashboardPage() {
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium">{item.title}</p>
                                         <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
+                                        {item.context && (
+                                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                                                {item.context}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                         <span className="hidden rounded-full border px-2 py-1 text-xs sm:inline-flex">
