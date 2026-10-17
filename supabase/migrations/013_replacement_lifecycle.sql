@@ -86,7 +86,7 @@ begin
                 where id = p_booking_id;
                 return v_existing.id;
             end if;
-            raise exception 'This booking already has an active or completed replacement';
+            raise exception 'This booking already has an active replacement';
         end if;
 
         if v_existing.status <> 'cancelled'
