@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { TableScrollArea } from "@/components/table-scroll-area"
 import {
     ArrowRight,
     CalendarClock,
@@ -228,8 +229,9 @@ export function QueueOverview({ kind, entries }: { kind: Kind; entries: QueueEnt
                         </div>
 
                         {/* Desktop: compact scanning table, with a separate action column. */}
-                        <div className="hidden overflow-x-auto lg:block">
-                            <table className="w-full min-w-[58rem] text-sm">
+                        <div className="hidden min-w-0 lg:block">
+                            <TableScrollArea label={isReplacement ? "Replacement queue" : "Reschedule queue"}>
+                                <table className="w-full min-w-[58rem] text-sm">
                                 <thead className="bg-muted/40 text-xs text-muted-foreground">
                                     <tr className="border-b">
                                         <th scope="col" className="px-5 py-3 text-left font-medium">Student / Class</th>
@@ -271,7 +273,8 @@ export function QueueOverview({ kind, entries }: { kind: Kind; entries: QueueEnt
                                         </tr>
                                     ))}
                                 </tbody>
-                            </table>
+                                </table>
+                            </TableScrollArea>
                         </div>
                     </>
                 )}
