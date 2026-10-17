@@ -161,3 +161,30 @@ still require their dedicated UX pass and manual phone-size browser checks.
 - Manual QA: toggle each theme from the header; check sidebar active state,
   forms, queues, dashboard and login at 393px and desktop widths; refresh and
   verify manual theme persists; test System by changing the OS theme.
+
+## Wave 2 — Parents, Students, Enrollments implemented
+
+- All three pages use `RecordDirectory`: record list first, visible Add action
+  to reveal/collapse the original create form, search, and status filters
+  on pages that actually have statuses. Form is not permanently above the list.
+- Small screens show readable **cards** with the crucial fields without sideways
+  scrolling. Desktop retains a dense table with the established TableScrollArea
+  navigation for half-width windows.
+- **Parents:** parent name, WhatsApp, phone and email; searchable by contact info.
+- **Students:** primary guardian, date of birth, laptop and active status;
+  searchable by student or guardian; link to create a parent first if absent.
+- **Enrollments:** student, programme and branch context, regular session,
+  frequency, start date and status; historical inactive student/branch/programme
+  names resolve from all records, while the create form offers only active
+  options. Clear missing prerequisite guidance when create is impossible.
+- Enrollment form keeps the existing dependent Branch → Programme → Session flow
+  and now clears the selected session when branch/programme changes, preventing
+  stale mismatched choices.
+- Shared `FormSubmit` presents a pending/loading state and disables duplicate
+  submit; create forms have programmatic labels and more suitable mobile
+  phone/email keyboard hints.
+- Scope is **UX/queries only**: no server-action rewrite, schema migration,
+  database data write, dependency or new paid service. Existing business
+  logic/validation is still enforced by the original server actions.
+- Remaining work: review/UX improvements to form submission error/success
+  feedback and further Schedule/detail-page overhaul, followed by browser QA.
