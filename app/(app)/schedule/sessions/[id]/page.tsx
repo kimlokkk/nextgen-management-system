@@ -212,8 +212,8 @@ export default async function ScheduleSessionPage({
 
     const rescheduleBookings = bookings.filter(
         (booking) =>
-            booking.attendance_status ===
-            "rescheduled"
+            booking.booking_type === "reschedule" &&
+            countsTowardsRegularCapacity(booking)
     )
 
     // =====================================================
@@ -367,7 +367,7 @@ export default async function ScheduleSessionPage({
             <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl border bg-background p-5">
                     <p className="text-sm text-muted-foreground">
-                        Regular
+                        Regular seats
                     </p>
 
                     <p className="mt-2 text-2xl font-bold">
@@ -396,6 +396,9 @@ export default async function ScheduleSessionPage({
 
                     <p className="mt-2 text-2xl font-bold">
                         {rescheduleBookings.length}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        Included in regular seats
                     </p>
                 </div>
             </div>
