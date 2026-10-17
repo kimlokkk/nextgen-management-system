@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import { createClient } from "@/lib/supabase/server"
 import {
     approveSchedule,
@@ -267,6 +268,7 @@ export default async function SchedulePage({
                 </div>
 
                 <div className="overflow-hidden rounded-xl border bg-background">
+                    <TableScrollArea label="Monthly schedules 1">
                     <table className="w-full text-sm">
                         <thead className="bg-muted/50">
                             <tr className="border-b">
@@ -353,6 +355,7 @@ export default async function SchedulePage({
                             )}
                         </tbody>
                     </table>
+                    </TableScrollArea>
                 </div>
             </div>
 
@@ -492,6 +495,7 @@ export default async function SchedulePage({
                     )}
 
                     <div className="overflow-hidden rounded-xl border bg-background">
+                        <TableScrollArea label="Monthly schedules 2">
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50">
                                 <tr className="border-b">
@@ -606,6 +610,7 @@ export default async function SchedulePage({
                                 )}
                             </tbody>
                         </table>
+                        </TableScrollArea>
                     </div>
                 </div>
             )}
