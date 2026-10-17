@@ -298,8 +298,25 @@ export default async function ScheduleSessionPage({
         throw new Error(sourceResult.error?.message ?? targetResult.error?.message)
     }
 
-    const obligationMap = new Map(
-        (sourceResult.data ?? []).map((item) => [item.source_booking_id, item])
+    // A source can now have two historical rows: a cancelled reschedule
+    // plus a replacement. Active obligations must take display priority.
+    // When both are cancelled, favour replacement for Reopen Replacement.
+    const sourceObligations = sourceResult.data ?? []
+    const obligationMap = new Map([
+        ...sourceObligations.filter((item) =>
+            item.status === "cancelled" && item.obligation_type === "reschedule"
+        ).map((item) => [item.source_booking_id, item] as const),
+        ...sourceObligations.filter((item) =>
+            item.status === "cancelled" && item.obligation_type === "replacement"
+        ).map((item) => [item.source_booking_id, item] as const),
+        ...sourceObligations.filter((item) =>
+            item.status !== "cancelled"
+        ).map((item) => [item.source_booking_id, item] as const),
+    ])
+    const cancelledRescheduleSources = new Set(
+        sourceObligations.filter((item) =>
+            item.obligation_type === "reschedule" && item.status === "cancelled"
+        ).map((item) => item.source_booking_id)
     )
     const targetObligationMap = new Map(
         (targetResult.data ?? []).map((item) => [item.target_booking_id, item])
@@ -637,6 +654,12 @@ export default async function ScheduleSessionPage({
                                                                 " · planned"}
                                                         </span>
 
+                                                        {cancelledRescheduleSources.has(booking.id) && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Previous reschedule cancelled · history retained
+                                                            </span>
+                                                        )}
+
                                                         {obligation.obligation_type === "replacement" &&
                                                             ["open", "scheduled", "completed"].includes(obligation.status) &&
                                                             booking.booking_type === "regular" &&
@@ -664,7 +687,7 @@ export default async function ScheduleSessionPage({
                                                     <div className="flex flex-wrap items-center gap-3">
                                                         {booking.attendance_status === "upcoming" &&
                                                             !sessionEnded &&
-                                                            (!obligation || obligation.obligation_type === "reschedule") && (
+                                                            (!obligation || obligation.status === "cancelled" || obligation.obligation_type === "reschedule") && (
                                                                 <form action={markForReschedule}>
                                                                     <input type="hidden" name="booking_id" value={booking.id} />
                                                                     <input type="hidden" name="session_id" value={session.id} />
@@ -677,7 +700,7 @@ export default async function ScheduleSessionPage({
                                                                 </form>
                                                             )}
 
-                                                        {(!obligation || obligation.obligation_type === "replacement") &&
+                                                        {(!obligation || obligation.status === "cancelled" || obligation.obligation_type === "replacement") &&
                                                             (sessionEnded || booking.attendance_status === "upcoming") && (
                                                                 <form action={initiateReplacement}>
                                                                     <input type="hidden" name="booking_id" value={booking.id} />
@@ -700,13 +723,11 @@ export default async function ScheduleSessionPage({
                                                                 </form>
                                                             )}
 
-                                                        {obligation?.status === "cancelled" &&
-                                                            obligation.obligation_type === "reschedule" &&
-                                                            sessionEnded && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    Existing cancelled reschedule record
-                                                                </span>
-                                                            )}
+                                                        {cancelledRescheduleSources.has(booking.id) && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Previous reschedule cancelled · history retained
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <span className="text-muted-foreground">
