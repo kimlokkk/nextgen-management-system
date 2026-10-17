@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import { createClient } from "@/lib/supabase/server"
 import { createEnrollment } from "./actions"
 import { EnrollmentForm } from "@/components/enrollment-form"
@@ -106,7 +107,8 @@ export default async function EnrollmentsPage() {
                     </p>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="min-w-0 max-w-full">
+                    <TableScrollArea label="Enrollment list">
                     <table className="w-full text-sm">
                         <thead className="bg-muted/50">
                             <tr className="border-b">
@@ -165,6 +167,7 @@ export default async function EnrollmentsPage() {
                             )}
                         </tbody>
                     </table>
+                    </TableScrollArea>
                 </div>
             </div>
         </div>
