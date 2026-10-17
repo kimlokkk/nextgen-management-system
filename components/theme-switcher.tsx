@@ -20,7 +20,9 @@ const ThemeSwitcher = () => {
   const { theme, setTheme } = useTheme();
 
   if (!mounted) {
-    return null;
+    return (
+      <span aria-hidden="true" className="inline-block size-10 shrink-0 rounded-lg border bg-muted/50" />
+    );
   }
 
   const ICON_SIZE = 16;
@@ -28,16 +30,18 @@ const ThemeSwitcher = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        aria-label="Choose appearance"
+        title="Appearance: Light, Dark or System"
         className={buttonVariants({
-          variant: "ghost",
-          size: "sm",
+          variant: "outline",
+          className: "h-10 min-w-10 gap-2 rounded-lg border-border bg-background px-3 text-foreground shadow-none hover:border-primary/40 hover:bg-accent",
         })}
       >
         {theme === "light" ? (
           <Sun
             key="light"
             size={ICON_SIZE}
-            className="text-muted-foreground"
+            className="text-primary"
           />
         ) : theme === "dark" ? (
           <Moon
@@ -52,8 +56,9 @@ const ThemeSwitcher = () => {
             className="text-muted-foreground"
           />
         )}
+        <span className="hidden text-xs font-medium sm:inline">Theme</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-content" align="start">
+      <DropdownMenuContent className="min-w-36 rounded-lg border bg-popover p-1 shadow-lg" align="end">
         <DropdownMenuRadioGroup
           value={theme}
           onValueChange={(e) => setTheme(e)}
