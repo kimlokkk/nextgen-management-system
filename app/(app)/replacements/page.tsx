@@ -131,7 +131,7 @@ export default async function ReplacementsPage() {
                                     <td className="px-5 py-4 text-right">
                                         <Link
                                             href={`/replacements/${item.id}`}
-                                            className="font-medium underline underline-offset-4"
+                                            className="ui-action-link"
                                         >
                                             {item.status === "open" ? "Find Yellow Slot" : "View"}
                                         </Link>
