@@ -188,3 +188,36 @@ still require their dedicated UX pass and manual phone-size browser checks.
   logic/validation is still enforced by the original server actions.
 - Remaining work: review/UX improvements to form submission error/success
   feedback and further Schedule/detail-page overhaul, followed by browser QA.
+
+## Wave 3 — Schedule workspace redesign
+
+The monthly Schedule page now opens an available schedule automatically:
+1. **This month's locked batch** if available.
+2. This month's latest batch otherwise.
+3. The most recently generated available month otherwise.
+
+The selected schedule appears **before the archive/generator**, with:
+- Month, branch and status badge.
+- Count of sessions, regular seat usage/capacity and yellow seat
+  usage/capacity, plus a blocking validation summary.
+- Counts use `countsTowardsRegularCapacity` and
+  `countsTowardsReplacementCapacity` from the existing schedule policy,
+  matching the class detail page. The old hardcoded `0 / yellow capacity`
+  was misleading and has been removed.
+- A contextual approve (draft) or lock (approved) action, with validation;
+  locked schedules are clearly read-only at the batch level.
+- Class list: search by date/programme, week and programme filters,
+  mobile class cards with Review button, and a desktop table with explicit
+  horizontal scrolling.
+- Browse monthly schedules: searchable status filter, desktop table/mobile
+  cards, current selection marker, click to review a different batch.
+- Generate schedule is in an optional, collapsible panel below the
+  current workspace; warning states that regenerating an existing draft
+  replaces that draft and its bookings, and only active branches can be chosen.
+
+Important: no scheduling algorithm or server-action changes, no DB mutation
+or migration, no additional package. Need manual browser QA for:
+- Existing batches from different months/branches and invalid batch URL.
+- Locked, approved, draft and validation-error states.
+- Half-width desktop, iPhone, dark/light theme and class review links.
+- Correct regular/yellow occupancy on a real assignment.
