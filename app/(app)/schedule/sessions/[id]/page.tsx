@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
@@ -496,7 +497,8 @@ export default async function ScheduleSessionPage({
                     </p>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="min-w-0 max-w-full">
+                    <TableScrollArea label="Class roster">
                     <table className="w-full text-sm">
                         <thead className="bg-muted/50">
                             <tr className="border-b">
@@ -750,6 +752,7 @@ export default async function ScheduleSessionPage({
                             )}
                         </tbody>
                     </table>
+                    </TableScrollArea>
                 </div>
             </div>
         </div>
