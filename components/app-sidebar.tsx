@@ -6,37 +6,44 @@ import { usePathname } from "next/navigation"
 import {
     CalendarDays,
     ChevronRight,
-    CreditCard,
     LayoutDashboard,
     Menu,
     RefreshCw,
     RotateCcw,
-    Settings,
+    Settings2,
     UserRound,
     UsersRound,
     X,
 } from "lucide-react"
 
+// Group routes by what an admin wants to DO, not by the database table names.
+// The read-only /sessions page still exists; class configuration lives in Setup.
 const navigation = [
     {
         label: "Overview",
         items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
     },
     {
-        label: "Management",
+        label: "People",
         items: [
             { href: "/parents", label: "Parents", icon: UsersRound },
             { href: "/students", label: "Students", icon: UserRound },
             { href: "/enrollments", label: "Enrollments", icon: CalendarDays },
-            { href: "/schedule", label: "Schedule", icon: CalendarDays },
-            { href: "/reschedules", label: "Reschedules", icon: RefreshCw },
-            { href: "/replacements", label: "Replacements", icon: RotateCcw },
-            { href: "/housekeeping/sessions", label: "Housekeeping", icon: Settings },
         ],
     },
     {
-        label: "System",
-        items: [{ href: "/sessions", label: "Sessions", icon: Settings }],
+        label: "Class operations",
+        items: [
+            { href: "/schedule", label: "Class schedule", icon: CalendarDays },
+            { href: "/reschedules", label: "Reschedules", icon: RefreshCw },
+            { href: "/replacements", label: "Replacements", icon: RotateCcw },
+        ],
+    },
+    {
+        label: "Setup",
+        items: [
+            { href: "/housekeeping/sessions", label: "Class settings", icon: Settings2 },
+        ],
     },
 ]
 
@@ -157,17 +164,7 @@ export function AppSidebar() {
                                         </Link>
                                     )
                                 })}
-                                {group.label === "Management" && (
-                                    <span
-                                        aria-disabled="true"
-                                        title="Billing is coming soon"
-                                        className="flex min-h-11 cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/60"
-                                    >
-                                        <CreditCard className="size-4 shrink-0" aria-hidden="true" />
-                                        <span className="flex-1">Billing</span>
-                                        <span className="text-[10px]">Soon</span>
-                                    </span>
-                                )}
+
                             </div>
                         </div>
                     ))}
