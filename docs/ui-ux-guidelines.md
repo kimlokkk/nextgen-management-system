@@ -78,3 +78,68 @@ restrained visual accents, and an obvious next action. Functional safety always 
 - [ ] Hover and disabled states never misrepresent an available action.
 - [ ] Empty, error and pending states are understandable.
 - [ ] Existing business-flow regressions remain green.
+
+
+## Admin-centered information architecture (based on existing NextGen features)
+
+### Sidebar
+
+1. **Overview → Dashboard:** One entry point; no duplicate homepage.
+2. **People → Parents, Students, Enrollments:** These mirror the workflow of
+   enrolling a child (guardian contact → child profile → class enrollment).
+3. **Class operations → Class schedule, Reschedules, Replacements:** Day-to-day
+   work stays together; exceptions are separate from the schedule itself.
+4. **Setup → Class settings:** Capacity and weekly session templates.
+   The read-only Session directory remains accessible from Class settings rather
+   than occupying a near-duplicate primary menu item.
+5. **Billing** will be added to the navigation when implemented, not shown as a
+   fake interactive destination.
+
+### Page content order
+
+**Dashboard**
+- First: counts of students/enrollments and open exceptions.
+- Then: "Needs attention" action list **before** lower-priority weekly class listing.
+- Then: monthly attendance summary.
+- Any metric should name the time period/status it covers.
+
+**Reschedules / Replacements**
+- Clear purpose (what a new admin needs to do), not a generic "queue" heading.
+- 3 compact summaries: awaiting assignment, scheduled, history.
+- Search and an explicit filter: All / To assign / Scheduled / History.
+- Prioritize open requests in the list, then scheduled, then completed/cancelled.
+- Mobile: scannable **cards**, each with name, programme/branch, original class,
+  destination, status and an explicit full-width action.
+- Desktop: compact table with a real Action column.
+- No dependence on sideways swiping to reach the primary task.
+- Keep original and assigned class separate; do not imply cancellation means absence.
+
+**Parents, Students, Enrollments (next redesign)**
+- Default to **records first** with a search/filter and concise list.
+- The create flow should be a clearly labelled primary action that reveals
+  a form only when needed; long forms should not push the entire directory away.
+- Enrollment form: order by prerequisite: student → branch → programme →
+  regular session → frequency/start date.
+
+**Monthly Schedule (next redesign)**
+- Existing locked schedule and class review should be primary.
+- Generate a schedule remains a clearly labelled secondary operation.
+- Show month, branch, programme, lock state, capacity and conflicts without
+  mixing actions for draft vs locked schedules.
+
+**Session review / replacement detail (next redesign)**
+- Primary context and status at top.
+- Then today's student roster/capacity or original+target class.
+- Then one prominent next step (mark attendance, choose yellow slot).
+- Risky actions (cancel/release) separated into a lower-priority "More actions" area.
+
+### What has actually been implemented so far
+- Responsive sidebar + grouped menu with a clear disabled/active distinction.
+- Dashboard attention list moved before weekly classes.
+- Both queue pages now render mobile cards below the desktop table breakpoint
+  and include search, status filters, summaries and visible CTA buttons.
+- Shared hover, focus, button, input and table basics from Wave 1.
+
+These improvements are **not** a claim that every create/detail page has been
+fully redesigned. Parent/student/enrollment forms and schedule/detail screens
+still require their dedicated UX pass and manual phone-size browser checks.
