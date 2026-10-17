@@ -2,10 +2,11 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { countsTowardsReplacementCapacity } from "@/lib/reschedule-policy"
-import { assignReplacementSlot } from "./actions"
+import { assignReplacementSlot, changeReplacementSlot, cancelReplacement, completeReplacement } from "./actions"
 
 type PageProps = {
     params: Promise<{ id: string }>
+    searchParams: Promise<{ change?: string }>
 }
 
 type ClassBooking = {
@@ -44,8 +45,8 @@ function overlaps(firstStart: string, firstEnd: string, secondStart: string, sec
     return firstStart < secondEnd && secondStart < firstEnd
 }
 
-export default async function ReplacementDetailPage({ params }: PageProps) {
-    const { id } = await params
+export default async function ReplacementDetailPage({ params, searchParams }: PageProps) {
+    const [{ id }, query] = await Promise.all([params, searchParams])
     const supabase = await createClient()
 
     const { data: obligation, error: obligationError } = await supabase
@@ -109,6 +110,25 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
 
     const now = malaysiaNow()
     const open = obligation.status === "open" && !obligation.target_booking_id
+    const targetIsFuture = !!targetClass && (
+        targetClass.class_date > now.date ||
+        (targetClass.class_date === now.date && targetClass.start_time > now.time)
+    )
+    const targetHasEnded = !!targetClass && (
+        targetClass.class_date < now.date ||
+        (targetClass.class_date === now.date && targetClass.end_time <= now.time)
+    )
+    const canChange = obligation.status === "scheduled"
+        && targetBooking?.attendance_status === "upcoming"
+        && targetClass?.status === "scheduled"
+        && targetIsFuture
+    const canComplete = obligation.status === "scheduled"
+        && targetBooking?.attendance_status === "upcoming"
+        && targetClass?.status === "scheduled"
+        && targetHasEnded
+    const showChange = canChange && query.change === "1"
+    const showCandidates = open || showChange
+    const canCancel = open || canChange
     let candidates: Array<{
         id: string
         class_date: string
@@ -119,7 +139,7 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
         occupied: number
     }> = []
 
-    if (open) {
+    if (showCandidates) {
         const { data: batches, error: batchesError } = await supabase
             .from("schedule_batches")
             .select("id")
@@ -182,7 +202,7 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
         // Check the student's bookings across all programmes/branches.
         const { data: studentBookings, error: studentBookingsError } =
             await supabase.from("student_bookings")
-                .select("class_session_id, attendance_status")
+                .select("id, class_session_id, attendance_status")
                 .eq("student_id", obligation.student_id)
 
         if (studentBookingsError) {
@@ -191,6 +211,7 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
 
         const studentSessionIds = [...new Set((studentBookings ?? [])
             .filter((booking) =>
+                booking.id !== targetBooking?.id &&
                 !["rescheduled", "cancelled", "not_scheduled"].includes(booking.attendance_status)
             )
             .map((booking) => booking.class_session_id))]
@@ -239,6 +260,7 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
         candidates = sessionRows.flatMap((session) => {
             if (
                 session.id === original.id ||
+                session.id === targetClass?.id ||
                 session.session_template_id === original.session_template_id ||
                 (session.class_date === now.date && session.start_time <= now.time) ||
                 session.replacement_capacity <= 0 ||
@@ -331,10 +353,72 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
                 </div>
             </div>
 
-            {open && (
+            {canChange && (
+                <div className="flex flex-wrap items-center gap-4 rounded-xl border bg-background p-5">
+                    <Link
+                        href={showChange ? `/replacements/${obligation.id}` : `/replacements/${obligation.id}?change=1`}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                    >
+                        {showChange ? "Keep Current Slot" : "Change Replacement Slot"}
+                    </Link>
+                    <form action={cancelReplacement} className="flex items-center gap-3">
+                        <input type="hidden" name="obligation_id" value={obligation.id} />
+                        <input type="hidden" name="mode" value="release" />
+                        <button type="submit" className="text-sm font-medium underline underline-offset-4">
+                            Release Yellow Slot
+                        </button>
+                        <span className="text-xs text-muted-foreground">Keeps replacement entitlement open</span>
+                    </form>
+                </div>
+            )}
+
+            {canComplete && (
+                <form action={completeReplacement} className="space-y-3 rounded-xl border bg-background p-5">
+                    <h2 className="font-semibold">Complete Replacement Attendance</h2>
+                    <p className="text-sm text-muted-foreground">
+                        The replacement class has ended. Confirm that the student attended
+                        before marking the obligation as completed.
+                    </p>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="confirm_attendance" required />
+                        I confirm the student attended the replacement class.
+                    </label>
+                    <input type="hidden" name="obligation_id" value={obligation.id} />
+                    <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+                        Mark Present &amp; Complete
+                    </button>
+                </form>
+            )}
+
+            {canCancel && (
+                <form action={cancelReplacement} className="space-y-3 rounded-xl border bg-background p-5">
+                    <h2 className="font-semibold">Cancel Entire Replacement</h2>
+                    <p className="text-sm text-muted-foreground">
+                        This ends the entitlement and frees the assigned yellow seat, if any.
+                        The original class attendance will not be changed.
+                    </p>
+                    <input type="hidden" name="obligation_id" value={obligation.id} />
+                    <input type="hidden" name="mode" value="cancel" />
+                    <label htmlFor="cancel-replacement-reason" className="block text-sm font-medium">
+                        Reason (optional)
+                    </label>
+                    <input id="cancel-replacement-reason" name="reason" maxLength={300}
+                        placeholder="Why is this replacement cancelled?"
+                        className="h-10 w-full max-w-lg rounded-lg border bg-background px-3 text-sm" />
+                    <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="confirm_cancel" required />
+                        I understand this will cancel the replacement entitlement.
+                    </label>
+                    <button type="submit" className="rounded-lg border border-destructive px-4 py-2 text-sm font-medium text-destructive">
+                        Cancel Replacement
+                    </button>
+                </form>
+            )}
+
+            {showCandidates && (
                 <div className="space-y-4">
                     <div>
-                        <h2 className="text-xl font-semibold">Available Yellow Slots</h2>
+                        <h2 className="text-xl font-semibold">{showChange ? "Choose New Yellow Slot" : "Available Yellow Slots"}</h2>
                         <p className="mt-1 text-sm text-muted-foreground">
                             Locked future classes only. Regular seats cannot be used. We also exclude
                             the student&apos;s own weekly class time and overlapping bookings.
@@ -363,11 +447,11 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
                                             {session.occupied} / {session.replacement_capacity}
                                         </td>
                                         <td className="px-5 py-4 text-right">
-                                            <form action={assignReplacementSlot}>
+                                            <form action={showChange ? changeReplacementSlot : assignReplacementSlot}>
                                                 <input type="hidden" name="obligation_id" value={obligation.id} />
                                                 <input type="hidden" name="target_session_id" value={session.id} />
                                                 <button type="submit" className="font-medium underline underline-offset-4">
-                                                    Assign Yellow Slot
+                                                    {showChange ? "Move to This Slot" : "Assign Yellow Slot"}
                                                 </button>
                                             </form>
                                         </td>
@@ -387,10 +471,23 @@ export default async function ReplacementDetailPage({ params }: PageProps) {
                 </div>
             )}
 
-            {obligation.status === "scheduled" && (
+            {obligation.status === "scheduled" && !canChange && !canComplete && (
                 <p className="text-sm text-muted-foreground">
-                    Assigned replacements are read-only in Phase 2.
-                    Change Slot / Cancel will be handled as a separate safe workflow.
+                    This replacement is no longer available for slot changes or cancellation
+                    because its class has started. Attendance can be completed after class ends.
+                </p>
+            )}
+            {obligation.status === "completed" && (
+                <p className="rounded-xl border bg-background p-5 text-sm">
+                    Replacement attended and completed. This record is locked.
+                    {source.attendance_status === "upcoming" &&
+                        " Remember to confirm the original absence after its class finishes."}
+                </p>
+            )}
+            {obligation.status === "cancelled" && (
+                <p className="rounded-xl border bg-background p-5 text-sm">
+                    This replacement entitlement was cancelled. The original class attendance is unchanged.
+                    {obligation.reason && ` Reason: ${obligation.reason}`}
                 </p>
             )}
         </div>
