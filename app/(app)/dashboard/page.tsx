@@ -349,12 +349,60 @@ export default async function DashboardPage() {
                 <section className="min-w-0 overflow-hidden rounded-xl border bg-background">
                     <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
                         <div>
+                            <h2 className="font-semibold">Needs attention</h2>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Open makeup requests and this month&apos;s unmarked attendance
+                            </p>
+                        </div>
+                        <span className="rounded-full border px-3 py-1 text-xs font-medium tabular-nums">
+                            {outstanding} pending
+                        </span>
+                    </div>
+                    {attention.length ? (
+                        <div className="divide-y">
+                            {attention.map((item) => (
+                                <Link key={item.id} href={item.href}
+                                    className="group flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium">{item.title}</p>
+                                        <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
+                                        {item.context && (
+                                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                                                {item.context}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        <span className="hidden rounded-full border px-2 py-1 text-xs sm:inline-flex">
+                                            {item.kind}
+                                        </span>
+                                        <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
+                                    </div>
+                                </Link>
+                            ))}
+                            {outstanding > attention.length && (
+                                <p className="px-5 py-3 text-xs text-muted-foreground">
+                                    Showing {attention.length} actions. Open Reschedules, Replacements or Schedule for more.
+                                </p>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="px-5 py-10 text-center">
+                            <CheckCircle2 className="mx-auto size-7 text-muted-foreground" />
+                            <p className="mt-3 text-sm font-medium">Nothing pending</p>
+                            <p className="mt-1 text-xs text-muted-foreground">No open makeup requests or unmarked attendance this month.</p>
+                        </div>
+                    )}
+                </section>
+                <section className="min-w-0 overflow-hidden rounded-xl border bg-background">
+                    <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
+                        <div>
                             <h2 className="font-semibold">Classes this week</h2>
                             <p className="mt-1 text-xs text-muted-foreground">
                                 {displayDate(weekStart)} – {displayDate(weekEnd)} · Locked schedules
                             </p>
                         </div>
-                        <Link href="/schedule" className="shrink-0 text-sm font-medium underline underline-offset-4">
+                        <Link href="/schedule" className="ui-action-link shrink-0">
                             Schedule
                         </Link>
                     </div>
@@ -402,54 +450,6 @@ export default async function DashboardPage() {
                     )}
                 </section>
 
-                <section className="min-w-0 overflow-hidden rounded-xl border bg-background">
-                    <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
-                        <div>
-                            <h2 className="font-semibold">Needs attention</h2>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                Open makeup requests and this month&apos;s unmarked attendance
-                            </p>
-                        </div>
-                        <span className="rounded-full border px-3 py-1 text-xs font-medium tabular-nums">
-                            {outstanding} pending
-                        </span>
-                    </div>
-                    {attention.length ? (
-                        <div className="divide-y">
-                            {attention.map((item) => (
-                                <Link key={item.id} href={item.href}
-                                    className="group flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium">{item.title}</p>
-                                        <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
-                                        {item.context && (
-                                            <p className="mt-1 truncate text-xs text-muted-foreground">
-                                                {item.context}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="flex shrink-0 items-center gap-2">
-                                        <span className="hidden rounded-full border px-2 py-1 text-xs sm:inline-flex">
-                                            {item.kind}
-                                        </span>
-                                        <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
-                                    </div>
-                                </Link>
-                            ))}
-                            {outstanding > attention.length && (
-                                <p className="px-5 py-3 text-xs text-muted-foreground">
-                                    Showing {attention.length} actions. Open Reschedules, Replacements or Schedule for more.
-                                </p>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="px-5 py-10 text-center">
-                            <CheckCircle2 className="mx-auto size-7 text-muted-foreground" />
-                            <p className="mt-3 text-sm font-medium">Nothing pending</p>
-                            <p className="mt-1 text-xs text-muted-foreground">No open makeup requests or unmarked attendance this month.</p>
-                        </div>
-                    )}
-                </section>
             </div>
 
             <section className="rounded-xl border bg-background p-5">
