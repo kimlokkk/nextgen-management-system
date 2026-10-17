@@ -58,3 +58,5 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/013_replacement_lifecycle.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/replacement_integration.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/replacement_lifecycle.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/014_attendance_management.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/attendance_integration.sql
