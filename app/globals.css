@@ -948,7 +948,8 @@
 
   /* Old server pages contain tables inside border/overflow-hidden containers.
      Allow horizontal scrolling without clipping the last action column. */
-  .nextgen-app :is(.overflow-hidden, .overflow-x-hidden):has(> table) {
+  .nextgen-app div:has(> table) {
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
