@@ -884,3 +884,186 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+
+/*
+ * NextGen admin UI foundation — deliberate, restrained interaction design.
+ * Scoped to the authenticated workspace so auth pages and shadcn primitives
+ * elsewhere keep their own appearance.
+ */
+@layer components {
+  .nextgen-app {
+    --nextgen-ui-motion: 150ms ease;
+  }
+
+  .nextgen-app :is(a[href], button:not(:disabled), input, select, textarea) {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .nextgen-app :is(a[href], button:not(:disabled)) {
+    cursor: pointer;
+    transition:
+      background-color var(--nextgen-ui-motion),
+      border-color var(--nextgen-ui-motion),
+      color var(--nextgen-ui-motion),
+      box-shadow var(--nextgen-ui-motion),
+      opacity var(--nextgen-ui-motion);
+  }
+
+  .nextgen-app :is(a[href], button:not(:disabled), input, select, textarea):focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 3px;
+  }
+
+  .nextgen-app :is(button:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .nextgen-app :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea) {
+    min-width: 0;
+    max-width: 100%;
+    transition:
+      border-color var(--nextgen-ui-motion),
+      box-shadow var(--nextgen-ui-motion);
+  }
+
+  .nextgen-app :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea):not(:disabled):hover {
+    border-color: color-mix(in oklch, var(--color-foreground) 38%, var(--color-border));
+  }
+
+  .nextgen-app :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea):focus-visible {
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-ring) 15%, transparent);
+    outline: none;
+  }
+
+  .nextgen-app :is(input[type="checkbox"], input[type="radio"]) {
+    cursor: pointer;
+    accent-color: var(--color-foreground);
+  }
+
+  .nextgen-app label:has(input[type="checkbox"]:not(:disabled)) {
+    cursor: pointer;
+  }
+
+  /* Old server pages contain tables inside border/overflow-hidden containers.
+     Allow horizontal scrolling without clipping the last action column. */
+  .nextgen-app :is(.overflow-hidden, .overflow-x-hidden):has(> table) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nextgen-app table {
+    width: 100%;
+    min-width: 42rem;
+    border-collapse: collapse;
+  }
+
+  .nextgen-app table tbody tr {
+    transition: background-color var(--nextgen-ui-motion);
+  }
+
+  .nextgen-app table tbody tr:hover {
+    background-color: color-mix(in oklch, var(--color-muted) 44%, transparent);
+  }
+
+  .nextgen-app table a[href] {
+    color: var(--color-foreground);
+    text-underline-offset: 3px;
+  }
+
+  .nextgen-app table a[href]:hover {
+    text-decoration: underline;
+  }
+
+  .nextgen-app .ui-action-link {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-foreground);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .nextgen-app .ui-action-link:hover {
+    background-color: var(--color-muted);
+  }
+
+  .nextgen-app .ui-primary-action {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 0.6rem;
+    background-color: var(--color-primary);
+    padding: 0.55rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary-foreground);
+    text-decoration: none;
+  }
+
+  .nextgen-app .ui-primary-action:hover:not(:disabled) {
+    opacity: 0.88;
+    box-shadow: 0 2px 8px color-mix(in oklch, var(--color-foreground) 12%, transparent);
+  }
+
+  .nextgen-app .ui-secondary-action {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.6rem;
+    background-color: var(--color-background);
+    padding: 0.5rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-foreground);
+  }
+
+  .nextgen-app .ui-secondary-action:hover:not(:disabled) {
+    background-color: var(--color-muted);
+    border-color: color-mix(in oklch, var(--color-foreground) 25%, var(--color-border));
+  }
+
+  .nextgen-app .ui-interactive-card {
+    transition:
+      background-color var(--nextgen-ui-motion),
+      border-color var(--nextgen-ui-motion),
+      box-shadow var(--nextgen-ui-motion);
+  }
+
+  .nextgen-app .ui-interactive-card:hover {
+    border-color: color-mix(in oklch, var(--color-foreground) 27%, var(--color-border));
+    background-color: color-mix(in oklch, var(--color-muted) 28%, var(--color-background));
+    box-shadow: 0 3px 12px color-mix(in oklch, var(--color-foreground) 5%, transparent);
+  }
+}
+
+@media (hover: hover) {
+  .nextgen-app button:not(:disabled):not([aria-disabled="true"]):hover {
+    filter: brightness(0.94);
+  }
+  .dark .nextgen-app button:not(:disabled):not([aria-disabled="true"]):hover {
+    filter: brightness(1.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nextgen-app *,
+  .nextgen-app *::before,
+  .nextgen-app *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
