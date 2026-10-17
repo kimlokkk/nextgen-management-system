@@ -30,10 +30,12 @@ function formatMonth(value: string) {
 }
 
 function malaysiaMonth() {
-    return new Intl.DateTimeFormat("en-CA", {
+    const parts = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Asia/Kuala_Lumpur",
         year: "numeric", month: "2-digit",
-    }).format(new Date()).slice(0, 7)
+    }).formatToParts(new Date())
+    const value = (type: string) => parts.find((item) => item.type === type)?.value ?? ""
+    return `${value("year")}-${value("month")}`
 }
 
 export default async function SchedulePage({ searchParams }: PageProps) {
