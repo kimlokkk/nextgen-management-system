@@ -143,3 +143,21 @@ restrained visual accents, and an obvious next action. Functional safety always 
 These improvements are **not** a claim that every create/detail page has been
 fully redesigned. Parent/student/enrollment forms and schedule/detail screens
 still require their dedicated UX pass and manual phone-size browser checks.
+
+
+## Theme polish — Option C
+
+- `next-themes` is **already installed and wrapped in `app/layout.tsx`**;
+  don't install it again and do not nest a second ThemeProvider.
+- Header `Theme` menu offers Light, Dark and System and stores a manual choice
+  in browser storage through `next-themes`.
+- Theme palette is implemented in the final modern `:root` and `.dark` design
+  tokens in `app/globals.css`. Base colors are neutral with restrained emerald
+  accents for important navigation, calls to action, focus, and KPI icons.
+- Status meaning: amber open/pending, blue scheduled, emerald completed, rose
+  cancelled. Colors never replace text labels.
+- Both desktop and mobile share one token system and header theme picker.
+- UI-only: no schema change, Supabase update or additional dependency.
+- Manual QA: toggle each theme from the header; check sidebar active state,
+  forms, queues, dashboard and login at 393px and desktop widths; refresh and
+  verify manual theme persists; test System by changing the OS theme.
