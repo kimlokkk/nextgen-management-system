@@ -69,7 +69,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]))
     const programmeNames = new Map(programmes.map((programme) => [programme.id, programme.name]))
     const currentMonth = malaysiaMonth()
-    const prepareMonth = params.prepare_month && /^20\\d{2}-(0[1-9]|1[0-2])$/.test(params.prepare_month)
+    const prepareMonth = params.prepare_month && /^20\d{2}-(0[1-9]|1[0-2])$/.test(params.prepare_month)
         ? params.prepare_month : null
     const prepareBranch = branches.find((branch) => branch.is_active && branch.id === params.branch) ?? null
 
