@@ -2,7 +2,6 @@
 -- This is NOT a production schema or a Supabase migration.
 create extension if not exists pgcrypto;
 create schema auth;
-create table auth.users (id uuid primary key);
 create role authenticated nologin;
 create role anon nologin;
 
@@ -73,8 +72,6 @@ create table public.makeup_obligations (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
-
-insert into auth.users values ('00000000-0000-4000-8000-000000000001');
 
 insert into public.profiles values
     ('00000000-0000-4000-8000-000000000001', 'admin', true),
