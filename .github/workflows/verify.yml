@@ -23,8 +23,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      - name: Unit test calendar generator
-        run: node --test tests/scheduling-calendar.test.cjs
+      - name: Unit test calendar and timetable labels
+        run: node --test tests/scheduling-calendar.test.cjs tests/schedule-display.test.cjs
       - name: Build
         run: npm run build
 
