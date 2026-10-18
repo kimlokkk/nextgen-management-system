@@ -7,6 +7,7 @@ import {
 } from "@/lib/reschedule-policy"
 import { getScheduleBatchValidation } from "@/lib/schedule-validation"
 import { FormSubmit } from "@/components/form-submit"
+import { TransitionWeekOverview } from "@/components/transition-week-overview"
 import { ScheduleActions } from "@/components/schedule-actions"
 import {
     ScheduleBatchLibrary,
@@ -18,7 +19,7 @@ import {
 import { approveSchedule, generateSchedule, lockSchedule } from "./actions"
 
 type PageProps = {
-    searchParams: Promise<{ batch?: string }>
+    searchParams: Promise<{ batch?: string; prepare_month?: string; branch?: string }>
 }
 
 function formatMonth(value: string) {
@@ -68,6 +69,9 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]))
     const programmeNames = new Map(programmes.map((programme) => [programme.id, programme.name]))
     const currentMonth = malaysiaMonth()
+    const prepareMonth = params.prepare_month && /^20\\d{2}-(0[1-9]|1[0-2])$/.test(params.prepare_month)
+        ? params.prepare_month : null
+    const prepareBranch = branches.find((branch) => branch.is_active && branch.id === params.branch) ?? null
 
     // When no batch is named, open this month's locked schedule first;
     // otherwise select this month's batch, or the latest available record.
@@ -102,6 +106,10 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     }
 
     const sessions = classResult.data ?? []
+    const { data: activeSessionDays } = selectedBatch
+        ? await supabase.from("session_templates").select("day_of_week")
+            .eq("branch_id", selectedBatch.branch_id).eq("is_active", true)
+        : { data: [] as { day_of_week: number }[] }
     const ids = sessions.map((item) => item.id)
     const bookingResult = ids.length
         ? await supabase.from("student_bookings")
@@ -160,10 +168,16 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                     an undecided closure blocks affected class generation.
                 </p>
             </div>
+            {prepareMonth && (
+                <p className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+                    Preparing {formatMonth(prepareMonth)}. This only creates a draft;
+                    review and approve it separately before sharing with parents.
+                </p>
+            )}
             <form action={generateSchedule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                         <div>
                             <label htmlFor="schedule-generate-branch" className="mb-2 block text-sm font-medium">Branch *</label>
-                            <select id="schedule-generate-branch" name="branch_id" required defaultValue=""
+                            <select id="schedule-generate-branch" name="branch_id" required defaultValue={prepareBranch?.id ?? ""}
                                 className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm">
                                 <option value="" disabled>Select active branch</option>
                                 {branches.filter((branch) => branch.is_active).map((branch) => (
@@ -173,7 +187,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                         </div>
                         <div>
                             <label htmlFor="schedule-generate-month" className="mb-2 block text-sm font-medium">Month *</label>
-                            <input id="schedule-generate-month" type="month" name="month" required defaultValue={currentMonth}
+                            <input id="schedule-generate-month" type="month" name="month" required defaultValue={prepareMonth ?? currentMonth}
                                 className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm" />
                         </div>
                         <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground sm:col-span-2 lg:col-span-3">
@@ -205,7 +219,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                 selectedLabel={selectedBatch ? formatMonth(selectedBatch.schedule_month) : undefined}
                 selectedBranch={selectedBatch ? branchNames.get(selectedBatch.branch_id) ?? "Branch unavailable" : undefined}
                 scheduleCount={batches.length}
-                initialPanel={batches.length === 0 ? "generate" : params.batch && !selectedBatch ? "browse" : null}
+                initialPanel={prepareMonth || batches.length === 0 ? "generate" : params.batch && !selectedBatch ? "browse" : null}
                 library={<ScheduleBatchLibrary batches={batchSummaries} selectedId={selectedBatch?.id ?? null} />}
                 generator={generatePanel}
             />
@@ -242,6 +256,12 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                         </div>
                     </section>
 
+                    <TransitionWeekOverview
+                        year={Number(selectedBatch.schedule_month.slice(0, 4))}
+                        month={Number(selectedBatch.schedule_month.slice(5, 7))}
+                        branchId={selectedBatch.branch_id}
+                        dayOfWeeks={(activeSessionDays ?? []).map((item) => item.day_of_week)}
+                    />
                     {validation && (
                         <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Schedule validation">
                             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
