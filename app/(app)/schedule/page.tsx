@@ -92,7 +92,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
 
     const classResult = selectedBatch
         ? await supabase.from("class_sessions")
-            .select("id, programme_id, class_date, week_number, start_time, end_time, regular_capacity, replacement_capacity")
+            .select("id, programme_id, session_template_id, class_date, week_number, start_time, end_time, regular_capacity, replacement_capacity")
             .eq("schedule_batch_id", selectedBatch.id)
             .order("class_date")
             .order("start_time")
@@ -107,9 +107,10 @@ export default async function SchedulePage({ searchParams }: PageProps) {
 
     const sessions = classResult.data ?? []
     const { data: activeSessionDays } = selectedBatch
-        ? await supabase.from("session_templates").select("day_of_week")
+        ? await supabase.from("session_templates").select("id, name, day_of_week")
             .eq("branch_id", selectedBatch.branch_id).eq("is_active", true)
-        : { data: [] as { day_of_week: number }[] }
+        : { data: [] as { id: string; name: string; day_of_week: number }[] }
+    const templateNames = new Map((activeSessionDays ?? []).map((item) => [item.id, item.name]))
     const ids = sessions.map((item) => item.id)
     const bookingResult = ids.length
         ? await supabase.from("student_bookings")
@@ -138,6 +139,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
             date: item.class_date,
             week: item.week_number,
             programme: programmeNames.get(item.programme_id) ?? "Programme unavailable",
+            templateLabel: templateNames.get(item.session_template_id) ?? undefined,
             start: item.start_time,
             end: item.end_time,
             regularUsed: bookings.filter(countsTowardsRegularCapacity).length,
@@ -317,7 +319,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                             </div>
                         </section>
                     )}
-                    <ScheduleClassList classes={classes} />
+                    <ScheduleClassList key={selectedBatch.id} classes={classes} />
                 </>
             ) : (
                 <section className="rounded-xl border bg-card px-5 py-10 text-center">
