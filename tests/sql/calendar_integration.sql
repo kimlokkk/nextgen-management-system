@@ -101,7 +101,7 @@ begin
             end if;
     end;
 end;
-$;
+$$;
 
 -- Exercise admin/parent row-level restrictions with the fixture's stubbed
 -- auth.uid(). PostgreSQL superuser tests alone bypass RLS.
@@ -113,7 +113,7 @@ grant select, insert, update on public.academic_calendar_exceptions to authentic
 
 set role authenticated;
 set test.actor = '00000000-0000-4000-8000-000000000001';
-do $
+do $$
 begin
     insert into public.academic_calendar_exceptions
         (branch_id, closed_on, title, event_type)
@@ -124,10 +124,10 @@ begin
         raise exception 'Admin should be able to see events';
     end if;
 end;
-$;
+$$;
 
 set test.actor = '00000000-0000-4000-8000-000000000002';
-do $
+do $$
 begin
     if exists (select 1 from public.academic_calendar_exceptions
         where closed_on = '2026-11-07') then
@@ -142,7 +142,7 @@ begin
     exception when insufficient_privilege then null;
     end;
 end;
-$;
+$$;
 reset role;
 
 select 'Academic calendar DB guard and RLS tests passed' as result;
