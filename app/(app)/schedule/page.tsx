@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { AlertTriangle, CalendarDays, CheckCircle2, LockKeyhole } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import {
@@ -155,6 +156,8 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                     Select a branch and month to create a new draft.
                     Regenerating an existing draft will replace that draft and its bookings.
                     Approved and locked schedules cannot be regenerated.
+                    Plan branch closures in the <Link href="/housekeeping/calendar" className="font-semibold text-primary underline underline-offset-2">Academic Calendar</Link> first;
+                    an undecided closure blocks affected class generation.
                 </p>
             </div>
             <form action={generateSchedule} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
@@ -173,7 +176,12 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                             <input id="schedule-generate-month" type="month" name="month" required defaultValue={currentMonth}
                                 className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm" />
                         </div>
-                        <div className="flex items-end">
+                        <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground sm:col-span-2 lg:col-span-3">
+                            <input type="checkbox" name="confirm_regenerate" value="yes" className="mt-1 size-4 shrink-0 accent-primary" />
+                            If a draft already exists for this branch and month, I understand generating again
+                            permanently replaces that draft and its bookings.
+                        </label>
+                        <div className="flex items-end sm:col-span-2 lg:col-span-3">
                             <FormSubmit>Generate draft</FormSubmit>
                         </div>
                     </form>
