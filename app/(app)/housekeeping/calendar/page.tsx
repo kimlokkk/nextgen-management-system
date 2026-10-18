@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createCalendarEvent } from "./actions"
 import { CalendarDecisionForm, type CalendarDecision } from "@/components/calendar-decision-form"
 import { FormSubmit } from "@/components/form-submit"
+import { TransitionWeekOverview } from "@/components/transition-week-overview"
 import { TableScrollArea } from "@/components/table-scroll-area"
-import { generateClassSessions, getMonthlyDatesForDay, type CalendarException, type SessionTemplate } from "@/lib/scheduling"
+import { generateClassSessions, getMonthlyDatesForDay, getMonthlyTeachingCycle, type CalendarException, type SessionTemplate } from "@/lib/scheduling"
 
 type PageProps = {
     searchParams: Promise<{ branch?: string; month?: string }>
@@ -106,7 +107,7 @@ export default async function AcademicCalendarPage({ searchParams }: PageProps) 
     }
 
     const baseCount = templates.reduce((total, template) =>
-        total + getMonthlyDatesForDay(year, monthNumber, template.day_of_week).slice(0, 4).length, 0)
+        total + getMonthlyTeachingCycle(year, monthNumber, template.day_of_week).regularDates.length, 0)
     const sorted = [...preview].sort((a, b) =>
         a.class_date.localeCompare(b.class_date) || a.start_time.localeCompare(b.start_time)
         || a.programme_id.localeCompare(b.programme_id))
@@ -159,6 +160,8 @@ export default async function AcademicCalendarPage({ searchParams }: PageProps) 
 
             {!pageError && branchId && (
                 <>
+                    <TransitionWeekOverview year={year} month={monthNumber}
+                        dayOfWeeks={templates.map((t) => t.day_of_week)} branchId={branchId} />
                     {batch && (
                         <div className={`rounded-xl border p-4 sm:p-5 ${frozen ? "border-emerald-500/25 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
                             <div className="flex items-start gap-3">
@@ -215,7 +218,7 @@ export default async function AcademicCalendarPage({ searchParams }: PageProps) 
                             <div className="mt-4 divide-y rounded-lg border">
                                 {events.map((event) => {
                                     const relevantTemplates = templates.filter((t) =>
-                                        getMonthlyDatesForDay(year, monthNumber, t.day_of_week).slice(0, 4).includes(event.closed_on)
+                                        getMonthlyTeachingCycle(year, monthNumber, t.day_of_week).regularDates.includes(event.closed_on)
                                     )
                                     return (
                                         <article key={event.id} className="space-y-3 p-4">
