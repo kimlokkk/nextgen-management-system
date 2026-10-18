@@ -215,7 +215,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
             </header>
 
             <ScheduleActions
-                key={selectedBatch?.id ?? "no-schedule"}
+                key={`${selectedBatch?.id ?? "no-schedule"}:${prepareMonth ?? "current"}`}
                 selectedLabel={selectedBatch ? formatMonth(selectedBatch.schedule_month) : undefined}
                 selectedBranch={selectedBatch ? branchNames.get(selectedBatch.branch_id) ?? "Branch unavailable" : undefined}
                 scheduleCount={batches.length}
