@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { generateClassSessions, getMonthlyDatesForDay, type CalendarException, type SessionTemplate } from "@/lib/scheduling"
+import { generateClassSessions, getMonthlyTeachingCycle, type CalendarException, type SessionTemplate } from "@/lib/scheduling"
 
 const dateSchema = z.iso.date()
 const createSchema = z.object({
@@ -139,7 +139,7 @@ export async function setCalendarDecision(formData: FormData) {
 
     const templates = (templatesResult.data ?? []) as SessionTemplate[]
     if (decision === "move" && !templates.some((session) =>
-        getMonthlyDatesForDay(year, month, session.day_of_week).slice(0, 4).includes(current.closed_on)
+        getMonthlyTeachingCycle(year, month, session.day_of_week).regularDates.includes(current.closed_on)
     )) {
         throw new Error("No regular class is planned on this date. A class move is not applicable.")
     }
