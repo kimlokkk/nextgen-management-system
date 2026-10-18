@@ -1,4 +1,6 @@
 // Offline unit checks for the calendar-aware generator (no Supabase data).
+// This is a Node CommonJS test harness, so require() is intentional here.
+/* eslint-disable @typescript-eslint/no-require-imports */
 const test = require("node:test")
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
