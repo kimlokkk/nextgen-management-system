@@ -48,8 +48,7 @@ create table public.class_sessions (
     start_time time not null,
     end_time time not null,
     status text not null,
-    replacement_capacity integer not null,
-    updated_at timestamptz not null default now()
+    replacement_capacity integer not null
 );
 create table public.student_bookings (
     id uuid primary key default gen_random_uuid(),
@@ -142,5 +141,7 @@ insert into public.student_bookings (
 ) values
     ('80000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000001', '50000000-0000-4000-8000-000000000001', 'regular', 'upcoming'),
     ('80000000-0000-4000-8000-000000000002', '70000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000002', '50000000-0000-4000-8000-000000000002', 'regular', 'upcoming');
+
+alter table public.class_sessions add column updated_at timestamptz not null default now();
 
 set test.actor = '00000000-0000-4000-8000-000000000001';
