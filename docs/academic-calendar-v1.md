@@ -13,6 +13,35 @@ Example for MTDC, October 2026:
   to **2026-10-31**, lessons still run as **W4**, not as individual makeups.
 - Cyberjaya is unaffected: calendar exceptions are branch-specific.
 
+## Teaching weeks vs transition week (agreed September 2026 policy)
+
+**Do not equate W5 with a fifth regular/paid class.** Monthly regular lessons
+remain W1–W4 by default; the fifth occurrence of a weekday (if any) is an
+**administrative transition week** for creating and reviewing the next month's
+draft, not an automatic extra lesson. A four-occurrence weekday uses W4 for
+both its regular class and transition planning.
+
+Example, October 2026:
+- Saturday: 3, 10, 17, 24 Oct are regular W1–W4. Saturday **31 Oct is W5
+  transition** by default, not automatically generated as a fifth class.
+- Sunday: 4, 11, 18, 25 Oct are regular W1–W4. Sunday **25 Oct is W4
+  and transition**.
+- A separately *confirmed* branch closure may move Saturday 24 Oct W4 to
+  Saturday 31 Oct. The lesson still displays **W4**, while the date is also
+  the administrative **W5 transition date**; those are different concepts.
+- A source spreadsheet labelling 31 Oct W5 is **not** evidence of five
+  paid lessons or proof that 24 Oct was cancelled. Verify with the admin.
+- The transition CTA opens the next month's **draft generator** with the
+  month/branch preselected; it does **not** silently generate, approve, lock,
+  WhatsApp-blast or bill anything.
+
+Implementation: `getMonthlyTeachingCycle(year, month, dayOfWeek)` is the
+shared source of truth for four default regular teaching dates, the final
+weekday occurrence / transition label, and the next month. Neither draft
+regeneration nor a new approval is required just to display the transition
+week. Extra paid sessions or optional W5 teaching would need an explicit
+future enrollment/package rule rather than a calendar-dependent default.
+
 ## Event lifecycle
 
 | Decision | Meaning | Generator |
