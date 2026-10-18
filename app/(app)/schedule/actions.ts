@@ -74,24 +74,6 @@ export async function generateSchedule(
     }
 
     /*
-     * Kalau draft lama ada,
-     * delete dulu dan regenerate clean.
-     *
-     * class_sessions + bookings cascade delete.
-     */
-
-    if (existingBatch) {
-        const { error } = await supabase
-            .from("schedule_batches")
-            .delete()
-            .eq("id", existingBatch.id)
-
-        if (error) {
-            throw new Error(error.message)
-        }
-    }
-
-    /*
      * --------------------------------------------------
      * Load session templates
      * --------------------------------------------------
@@ -126,17 +108,56 @@ export async function generateSchedule(
     }
 
     /*
-     * --------------------------------------------------
-     * Generate W1-W4 class sessions
-     * --------------------------------------------------
+     * Calendar V1: admin decisions are resolved BEFORE any draft is deleted.
+     * A pending closure blocks generation; a move retains its W number.
      */
+    const monthEnd = `${month}-${new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()}`
+    const { data: calendarRows, error: calendarError } = await supabase
+        .from("academic_calendar_exceptions")
+        .select("closed_on, decision, target_on")
+        .eq("branch_id", branch_id)
+        .gte("closed_on", scheduleMonth)
+        .lte("closed_on", monthEnd)
 
-    const generatedSessions =
-        generateClassSessions(
-            sessionTemplates as SessionTemplate[],
-            year,
-            monthNumber
-        )
+    if (calendarError) {
+        throw new Error(`Could not load Academic Calendar. Apply migration 016 if needed: ${calendarError.message}`)
+    }
+
+    const generatedSessions = generateClassSessions(
+        sessionTemplates as SessionTemplate[],
+        year,
+        monthNumber,
+        (calendarRows ?? []).map((row) => ({
+            closed_on: row.closed_on,
+            decision: row.decision as "pending" | "move" | "skip" | "withdrawn",
+            target_on: row.target_on,
+        }))
+    )
+
+    if (generatedSessions.length === 0) {
+        throw new Error("No classes remain after calendar decisions. Review your Academic Calendar.")
+    }
+
+    /*
+     * Regeneration is destructive: approval must be explicit and we check
+     * calendar/template consistency before deleting the old draft.
+     */
+    if (existingBatch) {
+        if (formData.get("confirm_regenerate") !== "yes") {
+            throw new Error("An existing draft will be replaced. Tick the confirmation box before regenerating.")
+        }
+        const { data: deleted, error: deleteError } = await supabase
+            .from("schedule_batches")
+            .delete()
+            .eq("id", existingBatch.id)
+            .eq("status", "draft")
+            .select("id")
+            .maybeSingle()
+
+        if (deleteError || !deleted) {
+            throw new Error(deleteError?.message ?? "Draft changed. Refresh before regenerating.")
+        }
+    }
 
     /*
      * --------------------------------------------------
