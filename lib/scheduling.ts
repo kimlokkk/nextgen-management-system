@@ -61,6 +61,36 @@ export function getMonthlyDatesForDay(
     return dates
 }
 
+/**
+ * A monthly teaching cycle has at most four default regular lessons.
+ * The FINAL occurrence of a weekday is the administrative transition week:
+ * W5 when there are five occurrences (not a fifth paid lesson by default),
+ * otherwise W4, which can also be a normal teaching week.
+ *
+ * Transition week is for preparing/reviewing next month's draft.
+ * It must never change a student's entitlement without an explicit policy.
+ */
+export function getMonthlyTeachingCycle(
+    year: number,
+    month: number,
+    dayOfWeek: number
+) {
+    const dates = getMonthlyDatesForDay(year, month, dayOfWeek)
+    if (dates.length === 0) throw new Error("No dates for this weekday")
+    const regularDates = dates.slice(0, 4)
+    const transitionWeek = dates.length
+    const transitionDate = dates[dates.length - 1]
+    const nextMonthDate = new Date(Date.UTC(year, month, 1))
+    const nextMonth = `${nextMonthDate.getUTCFullYear()}-${String(nextMonthDate.getUTCMonth() + 1).padStart(2, "0")}`
+    return {
+        regularDates,
+        transitionDate,
+        transitionWeek,
+        transitionOnly: transitionWeek > regularDates.length,
+        nextMonth,
+    }
+}
+
 export function generateClassSessions(
     sessions: SessionTemplate[],
     year: number,
@@ -72,9 +102,9 @@ export function generateClassSessions(
     const monthKey = `${year}-${String(month).padStart(2, "0")}`
 
     for (const session of sessions) {
-        const regularDates = getMonthlyDatesForDay(
+        const { regularDates } = getMonthlyTeachingCycle(
             year, month, session.day_of_week
-        ).slice(0, 4)
+        )
 
         const usedDates = new Set<string>()
         regularDates.forEach((originalDate, index) => {
