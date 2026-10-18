@@ -338,7 +338,7 @@ export function ScheduleClassList({ classes }: { classes: ScheduleClassSummary[]
                         const dayClasses = group.slots.flatMap((slot) => slot.classes)
                         const dayRegular = dayClasses.reduce((total, item) => total + item.regularUsed, 0)
                         return (
-                            <details key={group.date + (allWeeks ? ":all" : ":week")} defaultOpen={!allWeeks}
+                            <details key={group.date + (allWeeks ? ":all" : ":week")} open={!allWeeks}
                                 className="group min-w-0 overflow-hidden rounded-xl border bg-card">
                                 <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 px-4 py-3.5 sm:px-5 [&::-webkit-details-marker]:hidden">
                                     <div className="flex min-w-0 items-center gap-3">
