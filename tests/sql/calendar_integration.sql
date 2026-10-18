@@ -86,7 +86,62 @@ begin
                 raise;
             end if;
     end;
-end;
-$$;
 
-select 'Academic calendar schema guards passed' as result;
+    begin
+        insert into academic_calendar_exceptions
+            (branch_id, closed_on, title, event_type)
+        values
+            ('10000000-0000-4000-8000-000000000001',
+             '2026-10-25', 'After approval', 'event');
+        raise exception 'Expected approved-month insert guard';
+    exception
+        when raise_exception then
+            if SQLERRM not like '%Calendar is frozen%' then
+                raise;
+            end if;
+    end;
+end;
+$;
+
+-- Exercise admin/parent row-level restrictions with the fixture's stubbed
+-- auth.uid(). PostgreSQL superuser tests alone bypass RLS.
+grant usage on schema auth to authenticated;
+grant execute on function auth.uid() to authenticated;
+grant select on public.profiles to authenticated;
+grant select, insert, update on public.academic_calendar_exceptions to authenticated;
+
+set role authenticated;
+set test.actor = '00000000-0000-4000-8000-000000000001';
+do $
+begin
+    insert into public.academic_calendar_exceptions
+        (branch_id, closed_on, title, event_type)
+    values ('10000000-0000-4000-8000-000000000001',
+            '2026-11-07', 'Admin holiday', 'holiday');
+    if not exists (select 1 from public.academic_calendar_exceptions
+        where closed_on = '2026-11-07') then
+        raise exception 'Admin should be able to see events';
+    end if;
+end;
+$;
+
+set test.actor = '00000000-0000-4000-8000-000000000002';
+do $
+begin
+    if exists (select 1 from public.academic_calendar_exceptions
+        where closed_on = '2026-11-07') then
+        raise exception 'Parent must not see admin calendar events';
+    end if;
+    begin
+        insert into public.academic_calendar_exceptions
+            (branch_id, closed_on, title, event_type)
+        values ('10000000-0000-4000-8000-000000000001',
+                '2026-11-14', 'Parent event', 'event');
+        raise exception 'Parent insert must be denied';
+    exception when insufficient_privilege then null;
+    end;
+end;
+$;
+reset role;
+
+select 'Academic calendar DB guard and RLS tests passed' as result;
