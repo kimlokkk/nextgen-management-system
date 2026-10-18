@@ -65,3 +65,5 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/015_cancelled_reschedule_to_replacement.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/cancelled_reschedule_replacement.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/calendar_integration.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/017_class_replacement_capacity_override.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/class_capacity_override.sql
