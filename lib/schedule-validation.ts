@@ -155,6 +155,37 @@ export async function getScheduleBatchValidation(
 
     const errors: string[] = []
 
+    // A draft must be regenerated if an event is created, changed or
+    // withdrawn after the batch was generated. Deleting events is prohibited
+    // by the migration, so timestamp-based invalidation is complete for V1.
+    const { data: batch, error: batchError } = await supabase
+        .from("schedule_batches")
+        .select("id, branch_id, schedule_month, generated_at")
+        .eq("id", batchId)
+        .single()
+
+    if (batchError || !batch) {
+        errors.push(batchError?.message ?? "Schedule batch no longer exists.")
+    } else {
+        const first = batch.schedule_month.slice(0, 7) + "-01"
+        const [year, month] = first.split("-").map(Number)
+        const nextMonth = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10)
+        const { data: changed, error: calendarError } = await supabase
+            .from("academic_calendar_exceptions")
+            .select("id")
+            .eq("branch_id", batch.branch_id)
+            .gte("closed_on", first)
+            .lt("closed_on", nextMonth)
+            .gt("updated_at", batch.generated_at)
+            .limit(1)
+
+        if (calendarError) {
+            errors.push(`Academic Calendar could not be checked: ${calendarError.message}`)
+        } else if (changed?.length) {
+            errors.push("Academic Calendar changed after generation. Regenerate this draft before approval.")
+        }
+    }
+
     // =====================================================
     // CAPACITY + BOOKING VALIDATION
     // =====================================================
