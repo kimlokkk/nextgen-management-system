@@ -126,3 +126,47 @@ in historical sheets are not treated as absence.
 - Should there be programme-specific or space-specific closures (MTDC Space 1/2)?
 - What approval/audit flow should apply when an event emerges **after locking**?
 - How are affected parents/facilitators notified when the date changes?
+
+
+## Historical MTDC reconciliation: per-class yellow-seat overrides (migration 017)
+
+In the October 2026 staging import, **101 regular placements and 352 regular
+bookings reconcile**, with no per-enrollment booking count mismatches. The 81
+legacy replacement rows remain in `nextgen_import`; they are NOT actual
+yellow-seat bookings and have not been granted new obligations.
+
+Five source slots contain six replacement names while the generated class
+yellow capacity is five:
+
+| Date | Space mapping | Time | Source/capacity |
+|---|---|---|---|
+| 2026-10-03 | Space 1 / JR_MAKER (staging only) | 11:00–12:30 | 6/5 |
+| 2026-10-04 | Space 2 / YOUNG_CODER (staging only) | 11:00–12:30 | 6/5 |
+| 2026-10-10 | Space 2 / YOUNG_CODER (staging only) | 09:00–10:30 | 6/5 |
+| 2026-10-11 | Space 2 / YOUNG_CODER (staging only) | 11:00–12:30 | 6/5 |
+| 2026-10-18 | Space 2 / YOUNG_CODER (staging only) | 11:00–12:30 | 6/5 |
+
+**Never raise template capacity to make a historical source count match.**
+After operations confirms physical room/facilitator capacity, an active admin
+can open **Class schedule → Review** for the individual class, expand
+**Adjust yellow seats for this class only**, explicitly acknowledge the
+change and give a reason. Migration 017 provides the audited, draft-only RPC.
+No defaults change and no capacity is adjusted merely by visiting the page.
+
+The one-class audit is retained even if a draft is regenerated (the affected
+class session reference becomes null on deletion). However, a manual override
+of a draft is **not** transferred into regenerated class sessions; operations
+must check it again after regeneration. Approved/locked classes cannot be
+adjusted using this action.
+
+**IMPORTANT:** Reconciliation still requires verifying historical source
+bookings and class eligibility. A capacity adjustment alone does not
+validate, import or create any of the 81 legacy replacement bookings.
+Two legacy replacement entries for a student not in the October roster may
+refer to earlier-month enrollment. Also, 72 W1 module entries remain
+unimported and are not a substitute for attendance confirmation.
+
+`supabase/migrations/017_class_replacement_capacity_override.sql` is committed
+on the feature branch only, NOT applied to the user's local/cloud DB by Git.
+Run local migrations explicitly only after backing up local staging. Do not
+apply to production without review.
