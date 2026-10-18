@@ -108,6 +108,7 @@ $;
 grant usage on schema auth to authenticated;
 grant execute on function auth.uid() to authenticated;
 grant select on public.profiles to authenticated;
+grant select on public.schedule_batches to authenticated;
 grant select, insert, update on public.academic_calendar_exceptions to authenticated;
 
 set role authenticated;
