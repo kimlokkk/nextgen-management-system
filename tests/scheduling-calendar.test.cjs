@@ -14,7 +14,7 @@ const { outputText } = ts.transpileModule(source, {
 })
 const moduleStub = { exports: {} }
 vm.runInNewContext(outputText, { module: moduleStub, exports: moduleStub.exports, Date, Set, Map, String, Number })
-const { generateClassSessions, getMonthlyDatesForDay } = moduleStub.exports
+const { generateClassSessions, getMonthlyDatesForDay, getMonthlyTeachingCycle } = moduleStub.exports
 
 const cyberjayaSat = [{
     id: "session-1", branch_id: "cyberjaya", programme_id: "jm",
@@ -86,4 +86,42 @@ test("branch-specific programmes sharing a slot move consistently", () => {
     const rows = generateClassSessions([cyberjayaSat[0], yc], 2026, 10, closure("move", "2026-10-31"))
     assert.equal(rows.length, 8)
     assert.equal(rows.filter(x => x.class_date === "2026-10-31").length, 2)
+})
+
+test("October Saturday W5 is an administrative transition, not an automatic fifth class", () => {
+    const cycle = getMonthlyTeachingCycle(2026, 10, 6)
+    assert.equal(cycle.transitionWeek, 5)
+    assert.equal(cycle.transitionDate, "2026-10-31")
+    assert.equal(cycle.transitionOnly, true)
+    assert.equal(cycle.nextMonth, "2026-11")
+    assert.equal(cycle.regularDates.length, 4)
+    assert.equal(baseline().length, 4)
+    assert.equal(baseline().some(x => x.week_number === 5), false)
+})
+
+test("October Sunday W4 is both a regular week and the transition week", () => {
+    const cycle = getMonthlyTeachingCycle(2026, 10, 0)
+    assert.equal(cycle.transitionWeek, 4)
+    assert.equal(cycle.transitionDate, "2026-10-25")
+    assert.equal(cycle.transitionOnly, false)
+    assert.deepEqual(Array.from(cycle.regularDates), [
+        "2026-10-04", "2026-10-11", "2026-10-18", "2026-10-25",
+    ])
+})
+
+test("transition week works for four-week months and December year rollover", () => {
+    const feb = getMonthlyTeachingCycle(2026, 2, 6)
+    assert.equal(feb.transitionWeek, 4)
+    assert.equal(feb.transitionDate, "2026-02-28")
+    assert.equal(feb.transitionOnly, false)
+    assert.equal(getMonthlyTeachingCycle(2026, 12, 6).nextMonth, "2027-01")
+})
+
+test("an explicit W4 move onto a transition-only W5 date keeps W4 lesson identity", () => {
+    const cycle = getMonthlyTeachingCycle(2026, 10, 6)
+    const moved = generateClassSessions(cyberjayaSat, 2026, 10, closure("move", cycle.transitionDate))
+    assert.equal(cycle.transitionWeek, 5)
+    assert.equal(moved.length, 4)
+    assert.equal(moved[3].week_number, 4)
+    assert.equal(moved[3].class_date, "2026-10-31")
 })
