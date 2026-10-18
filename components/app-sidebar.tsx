@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
     CalendarDays,
+    CalendarRange,
     ChevronRight,
     LayoutDashboard,
     Menu,
@@ -35,6 +36,7 @@ const navigation = [
         label: "Class operations",
         items: [
             { href: "/schedule", label: "Class schedule", icon: CalendarDays },
+            { href: "/housekeeping/calendar", label: "Academic calendar", icon: CalendarRange },
             { href: "/reschedules", label: "Reschedules", icon: RefreshCw },
             { href: "/replacements", label: "Replacements", icon: RotateCcw },
         ],
