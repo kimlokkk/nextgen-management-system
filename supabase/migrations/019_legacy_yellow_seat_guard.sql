@@ -147,7 +147,7 @@ for each row execute function public.guard_yellow_capacity_reduction();
 -- Exclusion requires an audited admin decision through migration 018.
 create or replace function public.guard_legacy_target_session_delete()
 returns trigger language plpgsql security definer set search_path = ''
-as $
+as $guard_legacy_target$
 begin
     if exists (
         select 1 from public.legacy_replacement_reviews r
@@ -158,7 +158,7 @@ begin
     end if;
     return old;
 end;
-$;
+$guard_legacy_target$;
 
 create trigger trg_guard_legacy_target_session_delete
 before delete on public.class_sessions
