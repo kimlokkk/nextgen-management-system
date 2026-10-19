@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import {
     LegacyReplacementReviewQueue,
     type LegacyReplacementReview,
@@ -33,11 +34,39 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
             replacement_date, programme_code, space_number, start_time, end_time,
             technical_status, review_state, review_note, source_date_type,
             over_capacity, original_booking_id, target_class_id,
-            source_booking_candidates, target_class_candidates`)
+            source_booking_candidates, target_class_candidates, linked_active_booking_id`)
         .eq("source_batch", "mtdc-2026-10")
         .order("replacement_date", { ascending: true })
         .order("start_time", { ascending: true })
         .order("source_ref", { ascending: true })
+
+    const rows = data ?? []
+    const sessionIds = [...new Set(rows
+        .map((row) => row.target_class_id)
+        .filter((id): id is string => !!id))]
+    const [classResult, bookingResult] = await Promise.all([
+        sessionIds.length
+            ? supabase.from("class_sessions")
+                .select("id, class_date, start_time, replacement_capacity")
+                .in("id", sessionIds)
+            : Promise.resolve({ data: [], error: null }),
+        sessionIds.length
+            ? supabase.from("student_bookings")
+                .select("id, class_session_id, booking_type, attendance_status")
+                .in("class_session_id", sessionIds)
+            : Promise.resolve({ data: [], error: null }),
+    ])
+    const seatDataError = classResult.error ?? bookingResult.error
+    const exceptions = (classResult.data ?? []).map((item) => ({
+        ...item,
+        usage: getYellowSeatUsage(
+            item.id, item.replacement_capacity,
+            bookingResult.data ?? [], rows
+        ),
+    })).filter((item) => item.usage.overBy > 0)
+        .sort((a, b) => a.class_date.localeCompare(b.class_date)
+            || a.start_time.localeCompare(b.start_time))
+    const extraSeats = exceptions.reduce((total, item) => total + item.usage.overBy, 0)
 
     return (
         <div className="min-w-0 space-y-5">
@@ -86,8 +115,55 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                         been loaded into it. Run the private local-only loader once.
                     </p>
                 </section>
+            ) : seatDataError ? (
+                <section className="rounded-xl border bg-card p-5">
+                    <h2 className="font-semibold">Cannot verify yellow seat capacity</h2>
+                    <p className="mt-2 text-sm text-destructive">{seatDataError.message}</p>
+                </section>
             ) : (
-                <LegacyReplacementReviewQueue rows={(data ?? []) as LegacyReplacementReview[]} />
+                <>
+                    <section aria-label="Historical yellow seat exceptions"
+                        className="rounded-xl border bg-card p-4 sm:p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <h2 className="font-semibold">Capacity decisions needed</h2>
+                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                    Total yellow bookings include Excel legacy and active replacements.
+                                    Do not approve additional seats unless the actual space and facilitator are confirmed.
+                                </p>
+                            </div>
+                            <span className="rounded-lg border bg-muted px-3 py-2 text-sm font-semibold tabular-nums">
+                                {exceptions.length} classes · {extraSeats} extra seats
+                            </span>
+                        </div>
+                        {exceptions.length === 0 ? (
+                            <p className="mt-3 text-sm text-primary">
+                                No over-capacity classes in the currently mapped legacy records.
+                            </p>
+                        ) : (
+                            <div className="mt-4 grid gap-2 md:grid-cols-2">
+                                {exceptions.map((item) => (
+                                    <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+                                        <div>
+                                            <p className="text-sm font-semibold">
+                                                {item.class_date} · {item.start_time.slice(0, 5)}
+                                            </p>
+                                            <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                                                {item.usage.occupied}/{item.usage.capacity} yellow seats
+                                                {" · "}{item.usage.legacy} Excel legacy + {item.usage.active} active
+                                            </p>
+                                        </div>
+                                        <Link href={"/schedule/sessions/" + item.id}
+                                            className="ui-secondary-action">
+                                            Review capacity →
+                                        </Link>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                    <LegacyReplacementReviewQueue rows={rows as LegacyReplacementReview[]} />
+                </>
             )}
         </div>
     )
