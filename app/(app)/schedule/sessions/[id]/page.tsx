@@ -713,7 +713,7 @@ export default async function ScheduleSessionPage({
                     )}
                     {(capacityAudit ?? []).length > 0 && (capacityReviews ?? []).length === 0 && (
                         <p className="mt-4 text-xs text-muted-foreground">
-                            {capacityAudit.length} earlier capacity adjustment(s) exist in the previous audit.
+                            {capacityAudit?.length ?? 0} earlier capacity adjustment(s) exist in the previous audit.
                         </p>
                     )}
                 </section>
