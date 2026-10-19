@@ -315,7 +315,7 @@ export function ScheduleClassList({ classes }: { classes: ScheduleClassSummary[]
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span aria-live="polite">
                         {isSearching ? "Searching the whole month" : allWeeks ? "All weeks" : "Week " + activeWeek}
-                        {" · "}{visible.length} classes · {regularUsed} regular bookings · {yellowUsed} yellow bookings
+                        {" · "}{visible.length} classes · {regularUsed} regular bookings · {yellowUsed} yellow seats reserved
                     </span>
                     {(day !== "all" || programme !== "all" || query || showAllWeeks) && (
                         <button type="button" onClick={resetFilters}
