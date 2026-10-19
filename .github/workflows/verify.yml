@@ -69,3 +69,5 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/017_class_replacement_capacity_override.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/class_capacity_override.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/legacy_replacement_review.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/019_legacy_yellow_seat_guard.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/legacy_yellow_seat_guard.sql
