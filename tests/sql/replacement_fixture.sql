@@ -15,7 +15,7 @@ create table public.profiles (
 );
 create table public.branches (id uuid primary key);
 create table public.programmes (id uuid primary key);
-create table public.students (id uuid primary key, status text not null);
+create table public.students (id uuid primary key, status text not null, full_name text not null default '');
 create table public.session_templates (
     id uuid primary key,
     branch_id uuid references public.branches(id),
