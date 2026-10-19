@@ -3,9 +3,9 @@ import { AlertTriangle, CalendarDays, CheckCircle2, LockKeyhole } from "lucide-r
 import { createClient } from "@/lib/supabase/server"
 import {
     countsTowardsRegularCapacity,
-    countsTowardsReplacementCapacity,
 } from "@/lib/reschedule-policy"
 import { getScheduleBatchValidation } from "@/lib/schedule-validation"
+import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import { FormSubmit } from "@/components/form-submit"
 import { TransitionWeekOverview } from "@/components/transition-week-overview"
 import { ScheduleActions } from "@/components/schedule-actions"
@@ -114,7 +114,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     const ids = sessions.map((item) => item.id)
     const bookingResult = ids.length
         ? await supabase.from("student_bookings")
-            .select("class_session_id, booking_type, attendance_status")
+            .select("id, class_session_id, booking_type, attendance_status")
             .in("class_session_id", ids)
         : { data: [], error: null }
 
@@ -125,7 +125,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
         </div>
     }
 
-    const bookingsByClass = new Map<string, { booking_type: string; attendance_status: string }[]>()
+    const bookingsByClass = new Map<string, { id: string; class_session_id: string; booking_type: string; attendance_status: string }[]>()
     for (const booking of bookingResult.data ?? []) {
         const current = bookingsByClass.get(booking.class_session_id) ?? []
         current.push(booking)
@@ -134,22 +134,24 @@ export default async function SchedulePage({ searchParams }: PageProps) {
 
     // Operationally confirmed in the MTDC October Excel, but kept separate
     // from the modern replacement-entitlement/attendance pipeline.
-    const { data: legacySourceRows } = ids.length
+    const { data: legacySourceRows, error: legacySeatError } = ids.length
         ? await supabase.from("legacy_replacement_reviews")
-            .select("target_class_id")
+            .select("target_class_id, review_state, linked_active_booking_id")
             .eq("source_batch", "mtdc-2026-10")
-            .neq("review_state", "excluded")
             .in("target_class_id", ids)
-        : { data: [] as { target_class_id: string | null }[] }
-    const legacyCountByClass = new Map<string, number>()
-    for (const row of legacySourceRows ?? []) {
-        if (!row.target_class_id) continue
-        legacyCountByClass.set(row.target_class_id,
-            (legacyCountByClass.get(row.target_class_id) ?? 0) + 1)
+        : { data: [], error: null }
+    if (legacySeatError) {
+        return <section className="rounded-xl border bg-card p-5 text-sm text-destructive">
+            Cannot load confirmed legacy yellow seats: {legacySeatError.message}.
+            Apply local migration 019 before reviewing class capacity.
+        </section>
     }
 
     const classes: ScheduleClassSummary[] = sessions.map((item) => {
         const bookings = bookingsByClass.get(item.id) ?? []
+        const yellow = getYellowSeatUsage(
+            item.id, item.replacement_capacity, bookings, legacySourceRows ?? []
+        )
         return {
             id: item.id,
             date: item.class_date,
@@ -160,9 +162,10 @@ export default async function SchedulePage({ searchParams }: PageProps) {
             end: item.end_time,
             regularUsed: bookings.filter(countsTowardsRegularCapacity).length,
             regularCapacity: item.regular_capacity,
-            yellowUsed: bookings.filter(countsTowardsReplacementCapacity).length,
+            yellowUsed: yellow.occupied,
+            modernYellowUsed: yellow.active,
             yellowCapacity: item.replacement_capacity,
-            legacyBooked: legacyCountByClass.get(item.id) ?? 0,
+            legacyBooked: yellow.legacy,
         }
     })
 
