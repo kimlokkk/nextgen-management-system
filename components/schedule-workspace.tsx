@@ -26,6 +26,7 @@ export type ScheduleClassSummary = {
     regularCapacity: number
     yellowUsed: number
     yellowCapacity: number
+    legacyBooked?: number
 }
 
 export function ScheduleStatus({ status }: { status: string }) {
@@ -387,6 +388,18 @@ export function ScheduleClassList({ classes }: { classes: ScheduleClassSummary[]
                                                             <span>Regular <Capacity used={item.regularUsed} maximum={item.regularCapacity} label="Regular" /></span>
                                                             <span>Yellow <Capacity used={item.yellowUsed} maximum={item.yellowCapacity} label="Yellow" /></span>
                                                         </div>
+                                                        {!!item.legacyBooked && (
+                                                            <div className="mt-2 space-y-1">
+                                                                <p className="text-xs font-semibold text-primary">
+                                                                    {item.legacyBooked} Excel-confirmed legacy {item.legacyBooked === 1 ? "booking" : "bookings"}
+                                                                </p>
+                                                                {item.legacyBooked + item.yellowUsed > item.yellowCapacity && (
+                                                                    <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                                                                        Legacy source exceeds yellow-seat capacity — review required
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                         <Link href={"/schedule/sessions/" + item.id}
                                                             className="ui-action-link mt-2 w-full justify-between border bg-card">
                                                             Review class <ArrowRight className="size-4" aria-hidden="true" />
