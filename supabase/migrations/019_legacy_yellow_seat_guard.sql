@@ -142,6 +142,28 @@ create trigger trg_guard_yellow_capacity_reduction
 before update of replacement_capacity on public.class_sessions
 for each row execute function public.guard_yellow_capacity_reduction();
 
+-- Draft regeneration deletes/recreates class IDs. Prevent quietly orphaning
+-- an Excel-confirmed reservation via the existing ON DELETE SET NULL FK.
+-- Exclusion requires an audited admin decision through migration 018.
+create or replace function public.guard_legacy_target_session_delete()
+returns trigger language plpgsql security definer set search_path = ''
+as $
+begin
+    if exists (
+        select 1 from public.legacy_replacement_reviews r
+        where r.target_class_id = old.id
+          and r.review_state <> 'excluded'
+    ) then
+        raise exception 'Cannot delete/regenerate class: confirmed legacy replacement reservations still target it';
+    end if;
+    return old;
+end;
+$;
+
+create trigger trg_guard_legacy_target_session_delete
+before delete on public.class_sessions
+for each row execute function public.guard_legacy_target_session_delete();
+
 comment on column public.legacy_replacement_reviews.linked_active_booking_id is
     'Explicit one-to-one link for a verified matching modern booking; reserved seat is excluded only while the modern booking is actively occupying the SAME class.';
 
