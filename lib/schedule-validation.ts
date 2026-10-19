@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
+import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import {
     countsTowardsRegularCapacity,
-    countsTowardsReplacementCapacity,
 } from "@/lib/reschedule-policy"
 
 export type ScheduleValidationResult = {
@@ -86,6 +86,13 @@ export async function getScheduleBatchValidation(
     }
 
     const allBookings = bookings ?? []
+    const { data: legacyRows, error: legacyError } = await supabase
+        .from("legacy_replacement_reviews")
+        .select("target_class_id, review_state, linked_active_booking_id")
+        .in("target_class_id", sessionIds)
+    // Do not silently approve batches using only modern counts if historical
+    // reservations cannot be read; this could overbook confirmed Excel places.
+    const legacyReservations = legacyRows ?? []
 
     const studentIds = [
         ...new Set(
@@ -154,6 +161,7 @@ export async function getScheduleBatchValidation(
     )
 
     const errors: string[] = []
+    if (legacyError) errors.push(`Confirmed legacy reservations could not be checked: ${legacyError.message}`)
 
     // A draft must be regenerated if an event is created, changed or
     // withdrawn after the batch was generated. Deleting events is prohibited
@@ -206,13 +214,13 @@ export async function getScheduleBatchValidation(
                     )
             ).length
 
-        const replacementCount =
-            sessionBookings.filter(
-                (booking) =>
-                    countsTowardsReplacementCapacity(
-                        booking
-                    )
-            ).length
+        const yellow = getYellowSeatUsage(
+            session.id,
+            session.replacement_capacity,
+            sessionBookings,
+            legacyReservations
+        )
+        const replacementCount = yellow.occupied
 
         if (
             regularCount >
@@ -231,10 +239,7 @@ export async function getScheduleBatchValidation(
             session.replacement_capacity
         ) {
             errors.push(
-                `${session.class_date} ${session.start_time.slice(
-                    0,
-                    5
-                )}: replacement capacity exceeded (${replacementCount}/${session.replacement_capacity}).`
+                `${session.class_date} ${session.start_time.slice(0, 5)}: yellow seats exceeded (${replacementCount}/${session.replacement_capacity}: ${yellow.active} active + ${yellow.legacy} Excel legacy). Confirm this class capacity with operations before approval.`
             )
         }
 
