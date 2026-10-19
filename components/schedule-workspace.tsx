@@ -27,6 +27,7 @@ export type ScheduleClassSummary = {
     yellowUsed: number
     yellowCapacity: number
     legacyBooked?: number
+    modernYellowUsed?: number
 }
 
 export function ScheduleStatus({ status }: { status: string }) {
@@ -390,12 +391,13 @@ export function ScheduleClassList({ classes }: { classes: ScheduleClassSummary[]
                                                         </div>
                                                         {!!item.legacyBooked && (
                                                             <div className="mt-2 space-y-1">
-                                                                <p className="text-xs font-semibold text-primary">
-                                                                    {item.legacyBooked} Excel-confirmed legacy {item.legacyBooked === 1 ? "booking" : "bookings"}
+                                                                <p className="text-xs font-medium text-muted-foreground">
+                                                                    {item.legacyBooked} Excel legacy + {item.modernYellowUsed ?? 0} active
+                                                                    {" · "}{Math.max(0, item.yellowCapacity - item.yellowUsed)} seats left
                                                                 </p>
-                                                                {item.legacyBooked + item.yellowUsed > item.yellowCapacity && (
-                                                                    <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                                                                        Legacy source exceeds yellow-seat capacity — review required
+                                                                {item.yellowUsed > item.yellowCapacity && (
+                                                                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                                                        {item.yellowUsed - item.yellowCapacity} seat(s) over capacity · admin decision required
                                                                     </p>
                                                                 )}
                                                             </div>
