@@ -153,6 +153,23 @@ export default async function ScheduleSessionPage({
             .order("changed_at", { ascending: false })
             .limit(5)
         : { data: [], error: null }
+    // Historical source-bookings are already confirmed in the October MTDC sheet.
+    // Keep them separate from active student_bookings: old source dates/attendance
+    // are unverified, and this must never mint new obligations or seat rights.
+    const canReadLegacy = !!adminProfile?.is_active
+        && ["admin", "super_admin"].includes(adminProfile.role)
+    const { data: legacyData, error: legacyError } = canReadLegacy
+        ? await supabase.from("legacy_replacement_reviews")
+            .select("id, student_name, original_date, review_state, technical_status, over_capacity, source_date_type, space_number, source_row")
+            .eq("source_batch", "mtdc-2026-10")
+            .eq("target_class_id", session.id)
+            .neq("review_state", "excluded")
+            .order("student_name")
+        : { data: [], error: null }
+    const legacyReservations = legacyData ?? []
+    const sourceSlotOverCapacity = legacyReservations.length + (bookingResult.data ?? [])
+        .filter(countsTowardsReplacementCapacity).length > session.replacement_capacity
+
     const today = getMalaysiaDate()
     const sessionEnded =
         session.class_date < today ||
@@ -622,6 +639,70 @@ export default async function ScheduleSessionPage({
                             </div>
                         )}
                     </details>
+                </section>
+            )}
+
+            {canReadLegacy && (legacyReservations.length > 0 || legacyError) && (
+                <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Excel-confirmed historical replacement reservations">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="font-semibold">Historical replacement reservations</h2>
+                            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                                These names were booked for this class in the MTDC October Excel,
+                                confirmed as an operational source record. This is a separate
+                                legacy list, not the active attendance roster or a newly issued entitlement.
+                            </p>
+                        </div>
+                        <span className="rounded-lg border bg-muted px-3 py-1.5 text-sm font-semibold tabular-nums">
+                            {legacyReservations.length} legacy booked
+                        </span>
+                    </div>
+                    {legacyError ? (
+                        <p className="mt-3 text-sm text-destructive">
+                            Historical records unavailable. Check that local migration 018 and
+                            the private MTDC review import have completed.
+                        </p>
+                    ) : (
+                        <>
+                            {sourceSlotOverCapacity && (
+                                <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+                                    Source bookings plus active yellow bookings exceed this class&apos;s
+                                    yellow-seat capacity ({legacyReservations.length + replacementBookings.length}
+                                    /{session.replacement_capacity}). Keep the original reservations,
+                                    but confirm any capacity exception with operations.
+                                </p>
+                            )}
+                            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                                {legacyReservations.map((entry) => (
+                                    <div key={entry.id} className="rounded-lg border bg-muted/20 p-3">
+                                        <p className="text-sm font-semibold">{entry.student_name}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Excel-confirmed booking · Attendance not recorded
+                                            {entry.space_number ? " · MTDC Space " + entry.space_number : ""}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Original class: {entry.original_date ?? "Not confirmed"}
+                                            {entry.source_row ? " · Excel row " + entry.source_row : ""}
+                                        </p>
+                                        {(entry.technical_status === "ORIGINAL_DATE_NOT_BEFORE_TARGET"
+                                            || entry.technical_status === "MISSING_OCTOBER_ROSTER_IDENTITY"
+                                            || entry.over_capacity) && (
+                                            <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+                                                {entry.technical_status === "ORIGINAL_DATE_NOT_BEFORE_TARGET"
+                                                    ? "Check original / target date order"
+                                                    : entry.technical_status === "MISSING_OCTOBER_ROSTER_IDENTITY"
+                                                        ? "Confirm legacy student identity"
+                                                        : "Yellow-seat exception flagged"}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <Link href="/replacements/legacy" className="ui-action-link mt-3">
+                                Open legacy review and notes →
+                            </Link>
+                        </>
+                    )}
                 </section>
             )}
 
