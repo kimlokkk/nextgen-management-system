@@ -71,7 +71,6 @@ export function LegacyReplacementReviewQueue({ rows }: { rows: LegacyReplacement
     const visible = shown.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
 
     const choose = (value: string) => { setCategory(value); setPage(0) }
-    const pending = rows.filter((item) => item.review_state === "pending").length
     const flagged = rows.filter((item) => item.over_capacity).length
 
     return (
@@ -84,9 +83,9 @@ export function LegacyReplacementReviewQueue({ rows }: { rows: LegacyReplacement
                             Historical replacement evidence
                         </h2>
                         <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                            A private review queue for the MTDC October spreadsheet.
-                            These are historical source records, NOT active yellow-seat bookings.
-                            A candidate match is not proof that the student earned a replacement.
+                            The MTDC October Excel is an operations-confirmed record of legacy replacement reservations.
+                            These entries are not active attendance records or newly issued entitlements.
+                            Technical source-booking gaps do not invalidate the legacy Excel reservation.
                         </p>
                     </div>
                     <span className="rounded-lg bg-muted px-3 py-2 text-xs font-semibold">
@@ -95,9 +94,9 @@ export function LegacyReplacementReviewQueue({ rows }: { rows: LegacyReplacement
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                     {[
-                        { label: "Source candidates", value: rows.filter((r) => r.technical_status === "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW").length },
-                        { label: "Missing sources", value: rows.filter((r) => r.technical_status === "ORIGINAL_BOOKING_MISSING").length },
-                        { label: "Pending review", value: pending },
+                        { label: "Original booking found", value: rows.filter((r) => r.technical_status === "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW").length },
+                        { label: "History unavailable", value: rows.filter((r) => r.technical_status === "ORIGINAL_BOOKING_MISSING").length },
+                        { label: "Excel reservations", value: rows.filter((r) => r.review_state !== "excluded").length },
                         { label: "Overcapacity flagged", value: flagged },
                     ].map((item) => (
                         <div key={item.label} className="rounded-lg border bg-muted/30 p-3">
@@ -200,8 +199,9 @@ export function LegacyReplacementReviewQueue({ rows }: { rows: LegacyReplacement
                                     Evidence and admin notes
                                 </summary>
                                 <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                                    Check the original attendance/absence, programme, identity and seat approval.
-                                    “Evidence received” records progress only; it does not issue a replacement entitlement.
+                                    Excel lists this as a confirmed legacy booking. Use notes to reconcile the old source
+                                    attendance, identity, date order and seat exceptions. “Evidence received”
+                                    does not record attendance or issue a new entitlement.
                                 </p>
                                 <form action={saveLegacyReplacementReview} className="mt-3 grid gap-3">
                                     <input type="hidden" name="id" value={item.id} />
