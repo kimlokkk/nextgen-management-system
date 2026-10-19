@@ -132,6 +132,22 @@ export default async function SchedulePage({ searchParams }: PageProps) {
         bookingsByClass.set(booking.class_session_id, current)
     }
 
+    // Operationally confirmed in the MTDC October Excel, but kept separate
+    // from the modern replacement-entitlement/attendance pipeline.
+    const { data: legacySourceRows } = ids.length
+        ? await supabase.from("legacy_replacement_reviews")
+            .select("target_class_id")
+            .eq("source_batch", "mtdc-2026-10")
+            .neq("review_state", "excluded")
+            .in("target_class_id", ids)
+        : { data: [] as { target_class_id: string | null }[] }
+    const legacyCountByClass = new Map<string, number>()
+    for (const row of legacySourceRows ?? []) {
+        if (!row.target_class_id) continue
+        legacyCountByClass.set(row.target_class_id,
+            (legacyCountByClass.get(row.target_class_id) ?? 0) + 1)
+    }
+
     const classes: ScheduleClassSummary[] = sessions.map((item) => {
         const bookings = bookingsByClass.get(item.id) ?? []
         return {
@@ -146,6 +162,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
             regularCapacity: item.regular_capacity,
             yellowUsed: bookings.filter(countsTowardsReplacementCapacity).length,
             yellowCapacity: item.replacement_capacity,
+            legacyBooked: legacyCountByClass.get(item.id) ?? 0,
         }
     })
 
