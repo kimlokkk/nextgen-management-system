@@ -102,5 +102,20 @@ export default async function ReplacementsPage() {
         }
     })
 
-    return <QueueOverview kind="replacement" entries={entries} />
+    return (
+        <div className="min-w-0 space-y-5">
+            <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 sm:p-5">
+                <div>
+                    <h2 className="font-semibold">Historical replacement evidence</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Review imported MTDC October source records separately from active replacement obligations.
+                    </p>
+                </div>
+                <Link href="/replacements/legacy" className="ui-secondary-action">
+                    Review historical MTDC records →
+                </Link>
+            </section>
+            <QueueOverview kind="replacement" entries={entries} />
+        </div>
+    )
 }
