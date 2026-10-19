@@ -162,7 +162,6 @@ export default async function ScheduleSessionPage({
     const { data: legacyData, error: legacyError } = canReadLegacy
         ? await supabase.from("legacy_replacement_reviews")
             .select("id, student_name, original_date, review_state, technical_status, over_capacity, source_date_type, space_number, source_row, target_class_id, linked_active_booking_id")
-            .eq("source_batch", "mtdc-2026-10")
             .eq("target_class_id", session.id)
             .neq("review_state", "excluded")
             .order("student_name")
