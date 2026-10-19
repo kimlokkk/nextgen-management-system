@@ -137,7 +137,6 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     const { data: legacySourceRows, error: legacySeatError } = ids.length
         ? await supabase.from("legacy_replacement_reviews")
             .select("target_class_id, review_state, linked_active_booking_id")
-            .eq("source_batch", "mtdc-2026-10")
             .in("target_class_id", ids)
         : { data: [], error: null }
     if (legacySeatError) {
