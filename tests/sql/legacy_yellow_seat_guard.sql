@@ -80,6 +80,14 @@ begin
     end if;
 
     begin
+        delete from public.class_sessions
+        where id='70000000-0000-4000-8000-000000000003';
+        raise exception 'Regeneration deleted a class with confirmed legacy reservations';
+    exception when raise_exception then
+        if SQLERRM not like '%confirmed legacy replacement reservations%' then raise; end if;
+    end;
+
+    begin
         update public.legacy_replacement_reviews
         set linked_active_booking_id='80000000-0000-4000-8000-000000000002'
         where source_batch='fixture' and source_ref='guard-test-1';
