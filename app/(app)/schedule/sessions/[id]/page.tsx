@@ -5,7 +5,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { markForReschedule, initiateReplacement, recordAttendance } from "./actions"
-import { adjustClassReplacementCapacity } from "./capacity-actions"
+import { decideClassReplacementCapacity } from "./capacity-actions"
 import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import { FormSubmit } from "@/components/form-submit"
 import {
@@ -152,6 +152,13 @@ export default async function ScheduleSessionPage({
             .select("id, old_capacity, new_capacity, reason, changed_at")
             .eq("class_session_id", session.id)
             .order("changed_at", { ascending: false })
+            .limit(5)
+        : { data: [], error: null }
+    const { data: capacityReviews, error: capacityReviewError } = canAdjustDraftCapacity
+        ? await supabase.from("class_replacement_capacity_reviews")
+            .select("id, decision, old_capacity, new_capacity, active_count, legacy_count, verified_by, reason, decided_at")
+            .eq("class_session_id", session.id)
+            .order("decided_at", { ascending: false })
             .limit(5)
         : { data: [], error: null }
     // Historical source-bookings are already confirmed in the October MTDC sheet.
@@ -597,63 +604,118 @@ export default async function ScheduleSessionPage({
 
             {canAdjustDraftCapacity && (
                 <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Review single-class replacement capacity">
-                    <details>
-                        <summary className="cursor-pointer font-semibold">
-                            Adjust yellow seats for this class only
-                        </summary>
-                        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                            For a confirmed exception, adjust only this session, not the
-                            weekly template or other dates. A replacement roster alone
-                            is not proof of entitlement or room capacity. The reason
-                            and previous value are saved to an audit log.
+                    <h2 className="font-semibold">Yellow capacity decision · this class only</h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {yellowUsage.occupied}/{yellowUsage.capacity} seats · {yellowUsage.active} active + {yellowUsage.legacy} Excel legacy
+                        {yellowUsage.overBy > 0 ? ` · ${yellowUsage.overBy} over capacity` : ""}.
+                        The Excel is reservation evidence, not proof of attendance or replacement entitlement.
+                    </p>
+                    {legacyError || capacityAuditError || capacityReviewError ? (
+                        <p className="mt-3 rounded-lg border border-destructive/30 p-3 text-sm text-destructive">
+                            Decision forms disabled: capacity, audit or historical data is unavailable.
+                            Apply local-only migrations 017–020 before reviewing these classes.
                         </p>
-                        {capacityAuditError ? (
-                            <p className="mt-3 text-sm text-destructive">
-                                Capacity audit unavailable. Apply local migration 017 before changing seats.
-                            </p>
-                        ) : (
-                            <form action={adjustClassReplacementCapacity}
-                                className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                                <input type="hidden" name="session_id" value={session.id} />
-                                <input type="hidden" name="expected_capacity" value={session.replacement_capacity} />
-                                <label className="block">
-                                    <span className="mb-1.5 block text-sm font-medium">Yellow seat capacity</span>
-                                    <input type="number" name="new_capacity" min="0" max="50" required
-                                        defaultValue={session.replacement_capacity}
-                                        className="h-10 w-full rounded-lg border bg-background px-3" />
-                                </label>
-                                <label className="block">
-                                    <span className="mb-1.5 block text-sm font-medium">Reason (required)</span>
-                                    <input type="text" name="reason" required minLength={10} maxLength={500}
-                                        placeholder="Confirmed by admin; space/facilitator availability checked"
-                                        className="h-10 w-full rounded-lg border bg-background px-3" />
-                                </label>
-                                <label className="flex items-start gap-2 text-sm leading-6 sm:col-span-2">
-                                    <input type="checkbox" name="confirm_capacity" value="yes"
-                                        required className="mt-1 size-4 accent-primary" />
-                                    I confirm this one-class capacity change is approved by operations.
-                                    It does not create or validate historical replacement bookings.
-                                </label>
-                                <div className="sm:col-span-2">
-                                    <FormSubmit>Save capacity decision</FormSubmit>
-                                </div>
-                            </form>
-                        )}
-                        {(capacityAudit ?? []).length > 0 && (
-                            <div className="mt-5 border-t pt-4">
-                                <h3 className="text-sm font-semibold">Recent capacity decisions</h3>
-                                <ul className="mt-2 space-y-2 text-xs text-muted-foreground">
-                                    {(capacityAudit ?? []).map((row) => (
-                                        <li key={row.id}>
-                                            {row.old_capacity} → {row.new_capacity} yellow seats
-                                            {" · "}{new Date(row.changed_at).toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
-                                            {" · "}{row.reason}
-                                        </li>
-                                    ))}
-                                </ul>
+                    ) : (
+                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                            <div className="min-w-0 rounded-xl border bg-muted/20 p-4">
+                                <h3 className="font-semibold">Keep current capacity</h3>
+                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                    Record a manual resolution plan. The seat limit stays at
+                                    {" "}{session.replacement_capacity}; additional bookings remain blocked while full.
+                                </p>
+                                <form action={decideClassReplacementCapacity} className="mt-4 space-y-3">
+                                    <input type="hidden" name="session_id" value={session.id} />
+                                    <input type="hidden" name="expected_capacity" value={session.replacement_capacity} />
+                                    <input type="hidden" name="expected_occupied" value={yellowUsage.occupied} />
+                                    <input type="hidden" name="decision" value="retain" />
+                                    <label className="block">
+                                        <span className="mb-1 block text-sm font-medium">Resolution / follow-up note</span>
+                                        <textarea name="reason" rows={3} required minLength={10} maxLength={500}
+                                            placeholder="Who will resolve the excess reservation and how?"
+                                            className="w-full rounded-lg border bg-background p-3 text-sm" />
+                                    </label>
+                                    <label className="flex items-start gap-2 text-sm leading-5">
+                                        <input name="confirm_decision" type="checkbox" value="yes" required
+                                            className="mt-0.5 size-4 accent-primary" />
+                                        Record this decision without increasing the seat limit.
+                                    </label>
+                                    <FormSubmit>Keep capacity &amp; record plan</FormSubmit>
+                                </form>
                             </div>
-                        )}
-                    </details>
+                            <div className="min-w-0 rounded-xl border bg-muted/20 p-4">
+                                <h3 className="font-semibold">Approve verified exception</h3>
+                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                    Increase only this session after confirming the room and an available facilitator.
+                                    No new replacement or attendance is created.
+                                </p>
+                                <form action={decideClassReplacementCapacity} className="mt-4 space-y-3">
+                                    <input type="hidden" name="session_id" value={session.id} />
+                                    <input type="hidden" name="expected_capacity" value={session.replacement_capacity} />
+                                    <input type="hidden" name="expected_occupied" value={yellowUsage.occupied} />
+                                    <input type="hidden" name="decision" value="expand" />
+                                    <label className="block">
+                                        <span className="mb-1 block text-sm font-medium">New yellow-seat limit</span>
+                                        <input name="new_capacity" type="number" required
+                                            min={session.replacement_capacity + 1} max={50}
+                                            defaultValue={Math.min(50, Math.max(session.replacement_capacity + 1, yellowUsage.occupied))}
+                                            className="h-10 w-full rounded-lg border bg-background px-3 text-sm" />
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-sm font-medium">Confirmed by (staff / operations)</span>
+                                        <input name="verified_by" type="text" required minLength={3} maxLength={120}
+                                            placeholder="Who confirmed room and facilitator?"
+                                            className="h-10 w-full rounded-lg border bg-background px-3 text-sm" />
+                                    </label>
+                                    <label className="flex items-start gap-2 text-sm leading-5">
+                                        <input name="room_verified" type="checkbox" value="yes" required
+                                            className="mt-0.5 size-4 accent-primary" />
+                                        Room and physical space verified for the new limit.
+                                    </label>
+                                    <label className="flex items-start gap-2 text-sm leading-5">
+                                        <input name="facilitator_verified" type="checkbox" value="yes" required
+                                            className="mt-0.5 size-4 accent-primary" />
+                                        Facilitator available for the additional student(s).
+                                    </label>
+                                    <label className="block">
+                                        <span className="mb-1 block text-sm font-medium">Reason / supporting evidence</span>
+                                        <textarea name="reason" rows={3} required minLength={10} maxLength={500}
+                                            placeholder="Explain how the room and facilitator were verified"
+                                            className="w-full rounded-lg border bg-background p-3 text-sm" />
+                                    </label>
+                                    <label className="flex items-start gap-2 text-sm leading-5">
+                                        <input name="confirm_decision" type="checkbox" value="yes" required
+                                            className="mt-0.5 size-4 accent-primary" />
+                                        Confirm and audit this single-class exception.
+                                    </label>
+                                    <FormSubmit>Approve capacity exception</FormSubmit>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    {(capacityReviews ?? []).length > 0 && (
+                        <div className="mt-5 border-t pt-4">
+                            <h3 className="text-sm font-semibold">Recent capacity decisions</h3>
+                            <ul className="mt-2 space-y-2 text-sm leading-6 text-muted-foreground">
+                                {(capacityReviews ?? []).map((row) => (
+                                    <li key={row.id} className="rounded-lg bg-muted/30 p-3">
+                                        <span className="font-semibold text-foreground">
+                                            {row.decision === "retain" ? "Kept capacity" : "Verified expansion"}
+                                        </span>
+                                        {" · "}{row.old_capacity} → {row.new_capacity} yellow seats
+                                        {" · "}{row.active_count} active + {row.legacy_count} legacy
+                                        {" · "}{new Date(row.decided_at).toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
+                                        {row.verified_by ? ` · Confirmed by ${row.verified_by}` : ""}
+                                        <p className="mt-1 text-xs">{row.reason}</p>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {(capacityAudit ?? []).length > 0 && (capacityReviews ?? []).length === 0 && (
+                        <p className="mt-4 text-xs text-muted-foreground">
+                            {capacityAudit.length} earlier capacity adjustment(s) exist in the previous audit.
+                        </p>
+                    )}
                 </section>
             )}
 

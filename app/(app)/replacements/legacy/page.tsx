@@ -44,7 +44,7 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
     const sessionIds = [...new Set(rows
         .map((row) => row.target_class_id)
         .filter((id): id is string => !!id))]
-    const [classResult, bookingResult] = await Promise.all([
+    const [classResult, bookingResult, decisionResult] = await Promise.all([
         sessionIds.length
             ? supabase.from("class_sessions")
                 .select("id, class_date, start_time, replacement_capacity")
@@ -55,7 +55,19 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                 .select("id, class_session_id, booking_type, attendance_status")
                 .in("class_session_id", sessionIds)
             : Promise.resolve({ data: [], error: null }),
+        sessionIds.length
+            ? supabase.from("class_replacement_capacity_reviews")
+                .select("class_session_id, decision, decided_at")
+                .in("class_session_id", sessionIds)
+                .order("decided_at", { ascending: false })
+            : Promise.resolve({ data: [], error: null }),
     ])
+    const lastDecisionByClass = new Map<string, string>()
+    for (const decision of decisionResult.data ?? []) {
+        if (decision.class_session_id && !lastDecisionByClass.has(decision.class_session_id)) {
+            lastDecisionByClass.set(decision.class_session_id, decision.decision)
+        }
+    }
     const seatDataError = classResult.error ?? bookingResult.error
     const exceptions = (classResult.data ?? []).map((item) => ({
         ...item,
@@ -136,6 +148,11 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                                 {exceptions.length} classes · {extraSeats} extra seats
                             </span>
                         </div>
+                        {decisionResult.error && (
+                            <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+                                Decision status unavailable. Apply local migration 020 to enable capacity reviews.
+                            </p>
+                        )}
                         {exceptions.length === 0 ? (
                             <p className="mt-3 text-sm text-primary">
                                 No over-capacity classes in the currently mapped legacy records.
@@ -152,6 +169,11 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                                                 {item.usage.occupied}/{item.usage.capacity} yellow seats
                                                 {" · "}{item.usage.legacy} Excel legacy + {item.usage.active} active
                                             </p>
+                                            {lastDecisionByClass.get(item.id) === "retain" && (
+                                                <p className="mt-1 text-xs font-medium text-primary">
+                                                    Keep-capacity decision recorded · excess still unresolved
+                                                </p>
+                                            )}
                                         </div>
                                         <Link href={"/schedule/sessions/" + item.id}
                                             className="ui-secondary-action">

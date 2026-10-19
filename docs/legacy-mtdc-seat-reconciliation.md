@@ -63,3 +63,11 @@ After migration 019, on the current local import:
 
 Do not apply migration 019 to the live Supabase cloud without a separate
 deployment and migration review.
+
+## Capacity decision review (migration 020: local only)
+- Admin can retain current yellow capacity while recording a plan to resolve excess reservations. This leaves overcapacity warnings and booking restrictions unchanged.
+- Increasing capacity requires confirmed room space, facilitator availability, named confirmer and a note (all database enforced); affects only one draft scheduled class.
+- Both decisions audit the acting admin, time, old/new limit and active/legacy counts. Increases also use the existing migration 017 change audit.
+- Stale capacity or occupancy is rejected atomically. Legacy source records, regular bookings and attendance remain unchanged.
+- The old unverified capacity-adjust RPC is no longer executable by authenticated clients after migration 020.
+- Apply migration 020 only to the existing local MTDC staging database once 017–019 are installed. Cloud production must not be altered without a separate review.
