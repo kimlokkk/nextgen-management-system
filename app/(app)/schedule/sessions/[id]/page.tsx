@@ -6,6 +6,7 @@ import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { markForReschedule, initiateReplacement, recordAttendance } from "./actions"
 import { adjustClassReplacementCapacity } from "./capacity-actions"
+import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import { FormSubmit } from "@/components/form-submit"
 import {
     countsTowardsRegularCapacity,
@@ -160,15 +161,20 @@ export default async function ScheduleSessionPage({
         && ["admin", "super_admin"].includes(adminProfile.role)
     const { data: legacyData, error: legacyError } = canReadLegacy
         ? await supabase.from("legacy_replacement_reviews")
-            .select("id, student_name, original_date, review_state, technical_status, over_capacity, source_date_type, space_number, source_row")
+            .select("id, student_name, original_date, review_state, technical_status, over_capacity, source_date_type, space_number, source_row, target_class_id, linked_active_booking_id")
             .eq("source_batch", "mtdc-2026-10")
             .eq("target_class_id", session.id)
             .neq("review_state", "excluded")
             .order("student_name")
         : { data: [], error: null }
     const legacyReservations = legacyData ?? []
-    const sourceSlotOverCapacity = legacyReservations.length + (bookingResult.data ?? [])
-        .filter(countsTowardsReplacementCapacity).length > session.replacement_capacity
+    const yellowUsage = getYellowSeatUsage(
+        session.id,
+        session.replacement_capacity,
+        bookings.map((booking) => ({ ...booking, class_session_id: session.id })),
+        legacyReservations
+    )
+    const sourceSlotOverCapacity = yellowUsage.overBy > 0
 
     const today = getMalaysiaDate()
     const sessionEnded =
@@ -270,11 +276,11 @@ export default async function ScheduleSessionPage({
     }
 
     if (
-        replacementBookings.length >
+        yellowUsage.occupied >
         session.replacement_capacity
     ) {
         warnings.push(
-            `Replacement capacity exceeded: ${replacementBookings.length}/${session.replacement_capacity}`
+            `Yellow capacity exceeded: ${yellowUsage.occupied}/${session.replacement_capacity} (${yellowUsage.active} active + ${yellowUsage.legacy} Excel legacy)`
         )
     }
 
@@ -558,7 +564,7 @@ export default async function ScheduleSessionPage({
             <section aria-label="Class capacity" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {[
                     { label: "Regular seats", used: regularBookings.length, max: session.regular_capacity, icon: UsersRound },
-                    { label: "Yellow seats", used: replacementBookings.length, max: session.replacement_capacity, icon: CalendarClock },
+                    { label: "Yellow seats · active + Excel", used: yellowUsage.occupied, max: session.replacement_capacity, icon: CalendarClock },
                 ].map((item) => (
                     <div key={item.label} className="min-w-0 rounded-xl border bg-card p-4 shadow-sm shadow-primary/5 sm:p-5">
                         <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -579,6 +585,16 @@ export default async function ScheduleSessionPage({
                     <p className="mt-1 text-xs text-muted-foreground">Included in regular seats</p>
                 </div>
             </section>
+
+            {canReadLegacy && !legacyError && yellowUsage.legacy > 0 && (
+                <p className="rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
+                    Yellow seats: <strong className="text-foreground">{yellowUsage.active} active</strong>
+                    {" + "}<strong className="text-foreground">{yellowUsage.legacy} Excel legacy</strong>
+                    {" = "}<strong className="text-foreground">{yellowUsage.occupied} occupied</strong>
+                    {" · "}{yellowUsage.available} available.
+                    Legacy seats are reserved; attendance remains unrecorded.
+                </p>
+            )}
 
             {canAdjustDraftCapacity && (
                 <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Review single-class replacement capacity">
@@ -654,7 +670,7 @@ export default async function ScheduleSessionPage({
                             </p>
                         </div>
                         <span className="rounded-lg border bg-muted px-3 py-1.5 text-sm font-semibold tabular-nums">
-                            {legacyReservations.length} legacy booked
+                            {yellowUsage.legacy} legacy reserved
                         </span>
                     </div>
                     {legacyError ? (
@@ -667,7 +683,7 @@ export default async function ScheduleSessionPage({
                             {sourceSlotOverCapacity && (
                                 <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
                                     Source bookings plus active yellow bookings exceed this class&apos;s
-                                    yellow-seat capacity ({legacyReservations.length + replacementBookings.length}
+                                    yellow-seat capacity ({yellowUsage.occupied}
                                     /{session.replacement_capacity}). Keep the original reservations,
                                     but confirm any capacity exception with operations.
                                 </p>
