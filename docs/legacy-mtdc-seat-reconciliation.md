@@ -71,3 +71,10 @@ deployment and migration review.
 - Stale capacity or occupancy is rejected atomically. Legacy source records, regular bookings and attendance remain unchanged.
 - The old unverified capacity-adjust RPC is no longer executable by authenticated clients after migration 020.
 - Apply migration 020 only to the existing local MTDC staging database once 017–019 are installed. Cloud production must not be altered without a separate review.
+
+## Read-only original booking candidate comparison (no migration)
+- For explicit original_booking_id candidates, admin can compare the imported student's name/original date with the current source booking name, original session date/time, booking type and recorded attendance.
+- Matching text is explicitly NOT identity verification, attendance confirmation or replacement entitlement.
+- A candidate source marked Present is flagged for manual operations review; the app never changes it.
+- Missing original bookings and permission/query errors show an explicit unavailable state rather than silently implying a match.
+- There are no data writes, no automated source linkage, and no new migrations in this increment.

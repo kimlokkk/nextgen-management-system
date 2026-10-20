@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
+import type { OriginalBookingCandidate } from "@/lib/legacy-source-comparison"
 import {
     LegacyReplacementReviewQueue,
     type LegacyReplacementReview,
@@ -41,6 +42,59 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
         .order("source_ref", { ascending: true })
 
     const rows = data ?? []
+
+    // Only the explicit candidate original booking IDs (7 in the baseline MTDC
+    // import) are read. Never infer a missing source or match by student name.
+    // This is a READ-ONLY evidence preview, not conversion to an entitlement.
+    const originalCandidateIds = [...new Set(rows
+        .map((row) => row.original_booking_id)
+        .filter((id): id is string => !!id))]
+    const originalBookingResult = originalCandidateIds.length > 0
+        ? await supabase.from("student_bookings")
+            .select("id, student_id, class_session_id, booking_type, attendance_status")
+            .in("id", originalCandidateIds)
+        : { data: [], error: null }
+    const originalBookings = originalBookingResult.data ?? []
+    const sourceStudentIds = [...new Set(originalBookings.map((b) => b.student_id))]
+    const sourceClassIds = [...new Set(originalBookings.map((b) => b.class_session_id))]
+    const [originalStudentsResult, originalClassesResult] = await Promise.all([
+        sourceStudentIds.length
+            ? supabase.from("students")
+                .select("id, full_name").in("id", sourceStudentIds)
+            : Promise.resolve({ data: [], error: null }),
+        sourceClassIds.length
+            ? supabase.from("class_sessions")
+                .select("id, class_date, start_time, end_time")
+                .in("id", sourceClassIds)
+            : Promise.resolve({ data: [], error: null }),
+    ])
+    const originalBookingLookupError = [
+        originalBookingResult.error, originalStudentsResult.error,
+        originalClassesResult.error,
+    ].find(Boolean)?.message ?? null
+
+    const bookingById = new Map(originalBookings.map((b) => [b.id, b]))
+    const studentById = new Map((originalStudentsResult.data ?? []).map((s) => [s.id, s]))
+    const classById = new Map((originalClassesResult.data ?? []).map((c) => [c.id, c]))
+    const originalEvidenceByReview: Record<string, OriginalBookingCandidate | null> = {}
+    for (const row of rows) {
+        if (!row.original_booking_id) continue
+        const booking = bookingById.get(row.original_booking_id)
+        if (!booking) {
+            originalEvidenceByReview[row.id] = null
+            continue
+        }
+        const candidateStudent = studentById.get(booking.student_id)
+        const candidateClass = classById.get(booking.class_session_id)
+        originalEvidenceByReview[row.id] = {
+            studentName: candidateStudent?.full_name ?? null,
+            classDate: candidateClass?.class_date ?? null,
+            startTime: candidateClass?.start_time ?? null,
+            endTime: candidateClass?.end_time ?? null,
+            bookingType: booking.booking_type,
+            attendanceStatus: booking.attendance_status,
+        }
+    }
     const sessionIds = [...new Set(rows
         .map((row) => row.target_class_id)
         .filter((id): id is string => !!id))]
@@ -184,7 +238,11 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                             </div>
                         )}
                     </section>
-                    <LegacyReplacementReviewQueue rows={rows as LegacyReplacementReview[]} />
+                    <LegacyReplacementReviewQueue
+                        rows={rows as LegacyReplacementReview[]}
+                        originalEvidenceByReview={originalEvidenceByReview}
+                        originalBookingLookupError={originalBookingLookupError}
+                    />
                 </>
             )}
         </div>

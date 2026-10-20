@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { AlertTriangle, ArrowUpRight, ClipboardList, Search } from "lucide-react"
 import { saveLegacyReplacementReview } from "@/app/(app)/replacements/legacy/actions"
+import { compareLegacyOriginalCandidate, type OriginalBookingCandidate, type CandidateFieldComparison } from "@/lib/legacy-source-comparison"
 
 export type LegacyReplacementReview = {
     id: string
@@ -43,6 +44,12 @@ function readableDate(value: string | null) {
     }).format(new Date(value + "T00:00:00Z"))
 }
 
+const evidenceComparisonText: Record<CandidateFieldComparison, string> = {
+    same_text: "Text matches (not verification)",
+    different_text: "Different — investigate",
+    unavailable: "Cannot compare",
+}
+
 const reviewLabels: Record<string,string> = {
     pending: "Not reviewed",
     evidence_requested: "Evidence requested",
@@ -50,7 +57,13 @@ const reviewLabels: Record<string,string> = {
     excluded: "Not applicable / excluded",
 }
 
-export function LegacyReplacementReviewQueue({ rows }: { rows: LegacyReplacementReview[] }) {
+export function LegacyReplacementReviewQueue({
+    rows, originalEvidenceByReview, originalBookingLookupError,
+}: {
+    rows: LegacyReplacementReview[]
+    originalEvidenceByReview: Record<string, OriginalBookingCandidate | null>
+    originalBookingLookupError: string | null
+}) {
     const [category, setCategory] = useState("SOURCE_LINK_CANDIDATE_ADMIN_REVIEW")
     const [search, setSearch] = useState("")
     const [reviewFilter, setReviewFilter] = useState("all")
@@ -194,6 +207,69 @@ export function LegacyReplacementReviewQueue({ rows }: { rows: LegacyReplacement
                                     </Link>
                                 )}
                             </div>
+                            {item.original_booking_id && (
+                                <section className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3"
+                                    aria-label="Potential original booking evidence">
+                                    <p className="text-sm font-semibold">Potential original booking · read-only comparison</p>
+                                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                        An imported candidate ID is a lead for admin investigation, not confirmation
+                                        that this student earned a replacement or attended the original class.
+                                    </p>
+                                    {item.source_booking_candidates > 1 && (
+                                        <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+                                            {item.source_booking_candidates} source candidates were found. Do not assume the selected candidate is the correct one.
+                                        </p>
+                                    )}
+                                    {originalBookingLookupError ? (
+                                        <p className="mt-2 text-xs text-destructive">
+                                            Original booking evidence cannot be loaded. Try refreshing later.
+                                            Do not record a reconciliation decision from incomplete evidence.
+                                        </p>
+                                    ) : originalEvidenceByReview[item.id] ? (() => {
+                                        const evidence = originalEvidenceByReview[item.id]!
+                                        const compared = compareLegacyOriginalCandidate(
+                                            item.student_name, item.original_date, evidence
+                                        )
+                                        return (
+                                            <div className="mt-3 space-y-2 text-xs leading-5">
+                                                <div className="grid gap-2 sm:grid-cols-2">
+                                                    <div className="rounded-md border bg-background p-3">
+                                                        <p className="font-semibold text-foreground">Excel source</p>
+                                                        <p>Name: {item.student_name}</p>
+                                                        <p>Original date: {item.original_date ?? "Unavailable"}</p>
+                                                        {item.source_date_type === "year_assumed_2026" && (
+                                                            <p className="text-amber-800 dark:text-amber-300">Original year is assumed, not verified</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="rounded-md border bg-background p-3">
+                                                        <p className="font-semibold text-foreground">NextGen candidate</p>
+                                                        <p>Name: {evidence.studentName ?? "Unavailable"}</p>
+                                                        <p>Class date: {evidence.classDate ?? "Unavailable"}</p>
+                                                        <p>Class time: {evidence.startTime?.slice(0, 5) ?? "?"}–{evidence.endTime?.slice(0, 5) ?? "?"}</p>
+                                                        <p>Booking type: {evidence.bookingType}</p>
+                                                        <p>Recorded source attendance: {evidence.attendanceStatus}</p>
+                                                    </div>
+                                                </div>
+                                                <p>Name: {evidenceComparisonText[compared.name]} · Date: {evidenceComparisonText[compared.date]}</p>
+                                                {compared.originalMarkedPresent && (
+                                                    <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-amber-900 dark:text-amber-200">
+                                                        Original booking is marked Present. Ask operations to verify why a replacement was reserved.
+                                                        No attendance or entitlement has been changed.
+                                                    </p>
+                                                )}
+                                                <p className="text-muted-foreground">
+                                                    This panel is informational only. Use the separate admin notes below to document findings.
+                                                </p>
+                                            </div>
+                                        )
+                                    })() : (
+                                        <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
+                                            The referenced original booking is unavailable in the current dataset.
+                                            Request historical evidence; do not infer identity or eligibility.
+                                        </p>
+                                    )}
+                                </section>
+                            )}
                             <details className="mt-3 rounded-lg border bg-muted/20 p-3">
                                 <summary className="cursor-pointer text-sm font-semibold">
                                     Evidence and admin notes
