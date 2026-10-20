@@ -107,7 +107,7 @@ export function LegacyReplacementReviewQueue({
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                     {[
-                        { label: "Original booking found", value: rows.filter((r) => r.technical_status === "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW").length },
+                        { label: "Source link candidates", value: rows.filter((r) => r.technical_status === "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW").length },
                         { label: "History unavailable", value: rows.filter((r) => r.technical_status === "ORIGINAL_BOOKING_MISSING").length },
                         { label: "Excel reservations", value: rows.filter((r) => r.review_state !== "excluded").length },
                         { label: "Overcapacity flagged", value: flagged },
