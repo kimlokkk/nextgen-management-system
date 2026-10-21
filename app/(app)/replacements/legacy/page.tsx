@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
+import { compareSeptemberEvidence, type SeptemberEvidence, type SeptemberComparison } from "@/lib/september-reconciliation"
 import type { OriginalBookingCandidate } from "@/lib/legacy-source-comparison"
 import {
     LegacyReplacementReviewQueue,
@@ -42,6 +43,26 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
         .order("source_ref", { ascending: true })
 
     const rows = data ?? []
+
+    // Historical workbook rows are private and are loaded only by the local
+    // admin importer. No data here creates entitlement, attendance or bookings.
+    const { data: septemberData, error: septemberError } = await supabase
+        .from("legacy_september_evidence")
+        .select("source_ref, source_tab, source_row, evidence_kind, student_name, class_date, start_time, end_time, space_label, course, module_raw, attendance_raw, original_date")
+        .eq("source_batch", "mtdc-2026-09")
+        .limit(1000)
+    const septemberRows = (septemberData ?? []) as SeptemberEvidence[]
+    const septemberLoaded = !septemberError && septemberRows.length > 0
+    const septemberComparisonByReview: Record<string, SeptemberComparison> = {}
+    if (septemberLoaded) {
+        for (const row of rows) {
+            if (row.original_date?.startsWith("2026-09-")) {
+                septemberComparisonByReview[row.id] = compareSeptemberEvidence(
+                    row.student_name, row.original_date, septemberRows
+                )
+            }
+        }
+    }
 
     // Only the explicit candidate original booking IDs (7 in the baseline MTDC
     // import) are read. Never infer a missing source or match by student name.
@@ -242,6 +263,9 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                         rows={rows as LegacyReplacementReview[]}
                         originalEvidenceByReview={originalEvidenceByReview}
                         originalBookingLookupError={originalBookingLookupError}
+                        septemberComparisonByReview={septemberComparisonByReview}
+                        septemberLoaded={septemberLoaded}
+                        septemberError={!!septemberError}
                     />
                 </>
             )}

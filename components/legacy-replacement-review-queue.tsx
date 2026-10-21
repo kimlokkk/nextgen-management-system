@@ -5,6 +5,8 @@ import Link from "next/link"
 import { AlertTriangle, ArrowUpRight, ClipboardList, Search } from "lucide-react"
 import { saveLegacyReplacementReview } from "@/app/(app)/replacements/legacy/actions"
 import { compareLegacyOriginalCandidate, type OriginalBookingCandidate, type CandidateFieldComparison } from "@/lib/legacy-source-comparison"
+import { SeptemberEvidencePanel } from "@/components/september-evidence-panel"
+import type { SeptemberComparison } from "@/lib/september-reconciliation"
 
 export type LegacyReplacementReview = {
     id: string
@@ -59,10 +61,14 @@ const reviewLabels: Record<string,string> = {
 
 export function LegacyReplacementReviewQueue({
     rows, originalEvidenceByReview, originalBookingLookupError,
+    septemberComparisonByReview, septemberLoaded, septemberError,
 }: {
     rows: LegacyReplacementReview[]
     originalEvidenceByReview: Record<string, OriginalBookingCandidate | null>
     originalBookingLookupError: string | null
+    septemberComparisonByReview: Record<string, SeptemberComparison>
+    septemberLoaded: boolean
+    septemberError: boolean
 }) {
     const [category, setCategory] = useState("SOURCE_LINK_CANDIDATE_ADMIN_REVIEW")
     const [search, setSearch] = useState("")
@@ -70,7 +76,9 @@ export function LegacyReplacementReviewQueue({
     const [page, setPage] = useState(0)
 
     const shown = useMemo(() => rows.filter((item) =>
-        (category === "all" || item.technical_status === category)
+        (category === "all" || (category === "september"
+            ? item.original_date?.startsWith("2026-09-")
+            : item.technical_status === category))
         && (reviewFilter === "all" || item.review_state === reviewFilter)
         && (!search.trim() || [
             item.student_name, item.source_ref, item.programme_code,
@@ -85,6 +93,12 @@ export function LegacyReplacementReviewQueue({
 
     const choose = (value: string) => { setCategory(value); setPage(0) }
     const flagged = rows.filter((item) => item.over_capacity).length
+    const septemberOctoberRows = rows.filter((item) => item.original_date?.startsWith("2026-09-"))
+    const rosterMatches = septemberOctoberRows.filter((item) =>
+        (septemberComparisonByReview[item.id]?.roster.length ?? 0) > 0).length
+    const nameReviews = septemberOctoberRows.filter((item) =>
+        !septemberComparisonByReview[item.id]?.roster.length
+        && (septemberComparisonByReview[item.id]?.possibleNameVariation.length ?? 0) > 0).length
 
     return (
         <section className="min-w-0 overflow-hidden rounded-xl border bg-card">
@@ -118,6 +132,17 @@ export function LegacyReplacementReviewQueue({
                         </div>
                     ))}
                 </div>
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+                    <p className="font-semibold">September source reconciliation · {septemberOctoberRows.length} October records</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {septemberLoaded
+                            ? `${rosterMatches} same-date name matches · ${nameReviews} possible name variation(s).`
+                            : septemberError
+                                ? "September staging table unavailable (migration 021 required locally)."
+                                : "September historical dataset has not been imported into local staging."}
+                        {" "}Candidate matches are not validated original bookings or replacement entitlements.
+                    </p>
+                </div>
                 <nav className="flex flex-wrap gap-2" aria-label="Evidence categories">
                     {categories.map((item) => (
                         <button key={item.value} type="button" title={item.help}
@@ -129,6 +154,13 @@ export function LegacyReplacementReviewQueue({
                             {item.label} · {rows.filter((r) => r.technical_status === item.value).length}
                         </button>
                     ))}
+                    <button type="button" onClick={() => choose("september")}
+                        aria-pressed={category === "september"}
+                        className={category === "september"
+                            ? "min-h-10 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                            : "min-h-10 rounded-lg border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"}>
+                        September originals · {septemberOctoberRows.length}
+                    </button>
                     <button type="button" onClick={() => choose("all")} aria-pressed={category === "all"}
                         className={category === "all"
                             ? "min-h-10 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
@@ -270,6 +302,12 @@ export function LegacyReplacementReviewQueue({
                                     )}
                                 </section>
                             )}
+                            <SeptemberEvidencePanel
+                                originalDate={item.original_date}
+                                evidence={septemberComparisonByReview[item.id]}
+                                loaded={septemberLoaded}
+                                unavailable={septemberError}
+                            />
                             <details className="mt-3 rounded-lg border bg-muted/20 p-3">
                                 <summary className="cursor-pointer text-sm font-semibold">
                                     Evidence and admin notes

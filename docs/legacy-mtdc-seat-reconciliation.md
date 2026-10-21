@@ -78,3 +78,13 @@ deployment and migration review.
 - A candidate source marked Present is flagged for manual operations review; the app never changes it.
 - Missing original bookings and permission/query errors show an explicit unavailable state rather than silently implying a match.
 - There are no data writes, no automated source linkage, and no new migrations in this increment.
+
+## September 2026 evidence reconciliation (migration 021, local only)
+- Migration 021 stores isolated historical evidence records, with admin-only RLS and no client insert/update/delete permissions; no foreign-key connection to active sessions or student bookings.
+- Use the *private* generated September CSV from this chat, copy into gitignored `private/`, apply migration 021 to Supabase LOCAL only, then use `NEXTGEN_LOCAL_DATABASE_URL=... node scripts/import-mtdc-september-local.mjs private/NextGen_MTDC_September2026_PRIVATE_Evidence.csv --confirm-local`.
+- Import intentionally excludes phone numbers, ages, personal notes, and facilitator remarks.
+- The import includes 492 regular-roster-per-week lines and 130 legacy replacement lines. Regular roster presence and module/activity cell contents are not attendance. The meaning of raw replacement attendance marks (`/`, `TH`, blank) is UNCONFIRMED.
+- Sunday replacement Week 1 has a stale August 2 header, but contains no populated replacement rows; no guessed class date is imported.
+- Re-importing identical `source_ref` values skips them; the original historical evidence is immutable unless explicitly corrected with a separate audited workflow.
+- The October review screen now compares September original dates against same-date roster names and flags shortened-name variants and reused source-date replacement references for HUMAN verification. The old `technical_status` and original Booking ID remain unchanged.
+- Never run this migration or import on cloud production; do not put the private CSV or raw workbook into a Git commit.
