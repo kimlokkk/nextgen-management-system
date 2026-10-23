@@ -77,3 +77,5 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/september_evidence_access.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/022_legacy_reconciliation_decisions.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/legacy_reconciliation_decisions.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/023_guardian_link_resolution.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/guardian_link_resolution.sql
