@@ -389,7 +389,7 @@ export function LegacyReplacementReviewQueue({
                                             <input name="identity_confirmed" type="checkbox" value="yes"
                                                 defaultChecked={reconciliationByReview[item.id]?.identity_confirmed ?? false}
                                                 className="mt-0.5 size-4 accent-primary"/>
-                                            I personally verified this student's identity against source evidence.
+                                            I personally verified the student identity against source evidence.
                                         </label>
                                         <label className="flex items-start gap-2 text-xs">
                                             <input name="original_date_confirmed" type="checkbox" value="yes"
