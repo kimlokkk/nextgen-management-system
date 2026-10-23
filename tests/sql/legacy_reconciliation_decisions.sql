@@ -28,6 +28,14 @@ begin
   if SQLERRM not like '%Confirm identity%' then raise; end if;
  end;
 
+ begin
+  perform public.record_legacy_reconciliation_decision(
+   v_id,null,'source_correlated',false,false,'','Source correlation needs a documented reference');
+  raise exception 'Missing correlation evidence reference accepted';
+ exception when raise_exception then
+  if SQLERRM not like '%Cite the source evidence reference%' then raise; end if;
+ end;
+
  perform public.record_legacy_reconciliation_decision(
   v_id,null,'source_correlated',false,false,
   'September roster row 5','Name and date appear in historical roster only');
