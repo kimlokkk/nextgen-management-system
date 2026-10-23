@@ -349,6 +349,7 @@ export function LegacyReplacementReviewQueue({
                                 loaded={septemberLoaded}
                                 unavailable={septemberError}
                                 onUseReference={(reference) => selectReference(item.id, reference)}
+                                selectedReference={justSelected === item.id ? selectedReferences[item.id] : undefined}
                             />
                             <details className="mt-3 rounded-lg border bg-muted/20 p-3">
                                 <summary className="cursor-pointer text-sm font-semibold">
