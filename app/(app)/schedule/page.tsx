@@ -183,8 +183,8 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                 <h2 className="font-semibold">Generate monthly schedule</h2>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                     Select a branch and month to create a new draft.
-                    Regenerating an existing draft will replace that draft and its bookings.
-                    Approved and locked schedules cannot be regenerated.
+                    Generate brand-new drafts only. Existing draft, approved and locked schedules cannot be regenerated;
+                    their class IDs and bookings are protected.
                     Plan branch closures in the <Link href="/housekeeping/calendar" className="font-semibold text-primary underline underline-offset-2">Academic Calendar</Link> first;
                     an undecided closure blocks affected class generation.
                 </p>
@@ -211,11 +211,10 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                             <input id="schedule-generate-month" type="month" name="month" required defaultValue={prepareMonth ?? currentMonth}
                                 className="h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm" />
                         </div>
-                        <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground sm:col-span-2 lg:col-span-3">
-                            <input type="checkbox" name="confirm_regenerate" value="yes" className="mt-1 size-4 shrink-0 accent-primary" />
-                            If a draft already exists for this branch and month, I understand generating again
-                            permanently replaces that draft and its bookings.
-                        </label>
+                        <p className="text-xs leading-5 text-muted-foreground sm:col-span-2 lg:col-span-3">
+                            Existing schedules cannot be overwritten. Review the November preflight before
+                            creating the first draft for MTDC.
+                        </p>
                         <div className="flex items-end sm:col-span-2 lg:col-span-3">
                             <FormSubmit>Generate draft</FormSubmit>
                         </div>

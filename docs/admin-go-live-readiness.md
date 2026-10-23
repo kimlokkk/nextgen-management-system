@@ -42,3 +42,8 @@ No migrations or data writes are added by this audit screen.
 - Shows structural blockers: missing templates, inactive/missing students, frequency configurations with no W1–W4, calendar errors, duplicate student enrollment in a slot, and regular capacity overflow. Also explicitly blocks recommending regeneration if ANY November batch already exists (existing `generateSchedule` deletes prior draft before rewriting).
 - Review this before any November generation. Even a clean preview does not verify actual attendance, replacements, facilitator capacity, annual closures, billing or production readiness.
 - No guardian confirmation is guessed or required for class simulation. Hadi's unknown guardian remains a separate admin-source dependency.
+
+## Draft recreation safety gate
+- Schedule generation now refuses any existing branch/month batch, even a draft. The destructive `confirm_regenerate` and old delete/recreate branch have been removed; a unique database constraint still prevents concurrent duplicate batch creation.
+- A new-batch failure attempts cleanup and surfaces a prominent warning if cleanup itself fails. New-batch creation is still multi-request and must become transactionally atomic before unrestricted production release.
+- Data in earlier months is never regenerated. In particular, October's legacy sessions/attendance remain outside the new November flow.

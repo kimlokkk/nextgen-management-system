@@ -26,6 +26,11 @@ export async function generateSchedule(
     if (!user) {
         throw new Error("Unauthorized")
     }
+    const { data: profile, error: profileError } = await supabase.from("profiles")
+        .select("role,is_active").eq("id",user.id).single()
+    if (profileError || !profile?.is_active || !["admin","super_admin"].includes(profile.role)) {
+        throw new Error("Only active admins may generate a schedule")
+    }
 
     const parsed = generateSchema.safeParse({
         branch_id: formData.get("branch_id"),
@@ -57,6 +62,7 @@ export async function generateSchedule(
 
     const {
         data: existingBatch,
+        error: existingBatchError,
     } = await supabase
         .from("schedule_batches")
         .select("id, status")
@@ -64,13 +70,15 @@ export async function generateSchedule(
         .eq("schedule_month", scheduleMonth)
         .maybeSingle()
 
-    if (
-        existingBatch &&
-        existingBatch.status !== "draft"
-    ) {
-        throw new Error(
-            "Schedule already approved or locked"
-        )
+    // Hard fail closed: no schedule with existing class IDs is ever regenerated.
+    if (existingBatchError) throw new Error(existingBatchError.message)
+    if (existingBatch) {
+        throw new Error("A monthly schedule already exists for this branch. Open it instead. Regeneration is disabled to preserve class IDs and bookings.")
+    }
+    const { data: branch, error: branchError } = await supabase.from("branches")
+        .select("id,is_active").eq("id",branch_id).single()
+    if (branchError || !branch?.is_active) {
+        throw new Error("Selected branch is inactive or unavailable")
     }
 
     /*
@@ -138,26 +146,9 @@ export async function generateSchedule(
         throw new Error("No classes remain after calendar decisions. Review your Academic Calendar.")
     }
 
-    /*
-     * Regeneration is destructive: approval must be explicit and we check
-     * calendar/template consistency before deleting the old draft.
-     */
-    if (existingBatch) {
-        if (formData.get("confirm_regenerate") !== "yes") {
-            throw new Error("An existing draft will be replaced. Tick the confirmation box before regenerating.")
-        }
-        const { data: deleted, error: deleteError } = await supabase
-            .from("schedule_batches")
-            .delete()
-            .eq("id", existingBatch.id)
-            .eq("status", "draft")
-            .select("id")
-            .maybeSingle()
-
-        if (deleteError || !deleted) {
-            throw new Error(deleteError?.message ?? "Draft changed. Refresh before regenerating.")
-        }
-    }
+    // IMPORTANT: Never delete/recreate a draft in the generation path.
+    // A new batch is the only supported safe operation until an atomic
+    // in-database generation transaction and versioned regeneration are built.
 
     /*
      * --------------------------------------------------
@@ -343,11 +334,16 @@ export async function generateSchedule(
          * half-generated schedule.
          */
 
-        await supabase
+        const { error: cleanupError } = await supabase
             .from("schedule_batches")
             .delete()
             .eq("id", batch.id)
-
+            .eq("status", "draft")
+        if (cleanupError) {
+            throw new Error("New draft creation failed and cleanup failed. Do not retry: ask a developer to inspect batch " +
+                batch.id + ". Original error: " + (error instanceof Error ? error.message : String(error)) +
+                ". Cleanup error: " + cleanupError.message)
+        }
         throw error
     }
 

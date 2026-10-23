@@ -72,7 +72,7 @@ export function buildNovemberPreflight(input: PreviewInput): NovemberPreflight {
     let classes:ClassPreview[]=[]
     if (!input.templates.length) issue("blocker","NO_TEMPLATES","No active MTDC class templates found.")
     if (input.existingBatch) issue("blocker","BATCH_EXISTS",
-        `A November batch already exists (${input.existingBatch.status}). Do not regenerate: the current generator deletes and rebuilds drafts.`)
+        `A November batch already exists (${input.existingBatch.status}). Regeneration is disabled; review that existing batch instead.`)
 
     const missingTemplate = active.filter(e=>!e.default_session_id ||
        !templateById.has(e.default_session_id) ||
