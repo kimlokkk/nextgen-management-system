@@ -1,16 +1,4 @@
 -- Fixture only. Real student/parent records are NEVER included in GitHub CI.
-create table public.parents(id uuid primary key,full_name text not null);
-create table public.student_guardians(
- id uuid primary key default gen_random_uuid(),
- student_id uuid references public.students(id),
- parent_id uuid references public.parents(id),
- relationship text,
- is_primary boolean not null default false,
- unique(student_id,parent_id)
-);
-insert into public.parents(id,full_name) values
- ('90000000-0000-4000-8000-000000000001','Fixture guardian 1'),
- ('90000000-0000-4000-8000-000000000002','Fixture guardian 2');
 grant usage on schema auth to authenticated;
 grant execute on function auth.uid() to authenticated;
 grant select on public.profiles to authenticated;
