@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
+import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import {
     countsTowardsRegularCapacity,
-    countsTowardsReplacementCapacity,
 } from "@/lib/reschedule-policy"
 
 export type ScheduleValidationResult = {
@@ -86,6 +86,13 @@ export async function getScheduleBatchValidation(
     }
 
     const allBookings = bookings ?? []
+    const { data: legacyRows, error: legacyError } = await supabase
+        .from("legacy_replacement_reviews")
+        .select("target_class_id, review_state, linked_active_booking_id")
+        .in("target_class_id", sessionIds)
+    // Do not silently approve batches using only modern counts if historical
+    // reservations cannot be read; this could overbook confirmed Excel places.
+    const legacyReservations = legacyRows ?? []
 
     const studentIds = [
         ...new Set(
@@ -154,6 +161,38 @@ export async function getScheduleBatchValidation(
     )
 
     const errors: string[] = []
+    if (legacyError) errors.push(`Confirmed legacy reservations could not be checked: ${legacyError.message}`)
+
+    // A draft must be regenerated if an event is created, changed or
+    // withdrawn after the batch was generated. Deleting events is prohibited
+    // by the migration, so timestamp-based invalidation is complete for V1.
+    const { data: batch, error: batchError } = await supabase
+        .from("schedule_batches")
+        .select("id, branch_id, schedule_month, generated_at")
+        .eq("id", batchId)
+        .single()
+
+    if (batchError || !batch) {
+        errors.push(batchError?.message ?? "Schedule batch no longer exists.")
+    } else {
+        const first = batch.schedule_month.slice(0, 7) + "-01"
+        const [year, month] = first.split("-").map(Number)
+        const nextMonth = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10)
+        const { data: changed, error: calendarError } = await supabase
+            .from("academic_calendar_exceptions")
+            .select("id")
+            .eq("branch_id", batch.branch_id)
+            .gte("closed_on", first)
+            .lt("closed_on", nextMonth)
+            .gt("updated_at", batch.generated_at)
+            .limit(1)
+
+        if (calendarError) {
+            errors.push(`Academic Calendar could not be checked: ${calendarError.message}`)
+        } else if (changed?.length) {
+            errors.push("Academic Calendar changed after generation. Regenerate this draft before approval.")
+        }
+    }
 
     // =====================================================
     // CAPACITY + BOOKING VALIDATION
@@ -175,13 +214,13 @@ export async function getScheduleBatchValidation(
                     )
             ).length
 
-        const replacementCount =
-            sessionBookings.filter(
-                (booking) =>
-                    countsTowardsReplacementCapacity(
-                        booking
-                    )
-            ).length
+        const yellow = getYellowSeatUsage(
+            session.id,
+            session.replacement_capacity,
+            sessionBookings,
+            legacyReservations
+        )
+        const replacementCount = yellow.occupied
 
         if (
             regularCount >
@@ -200,10 +239,7 @@ export async function getScheduleBatchValidation(
             session.replacement_capacity
         ) {
             errors.push(
-                `${session.class_date} ${session.start_time.slice(
-                    0,
-                    5
-                )}: replacement capacity exceeded (${replacementCount}/${session.replacement_capacity}).`
+                `${session.class_date} ${session.start_time.slice(0, 5)}: yellow seats exceeded (${replacementCount}/${session.replacement_capacity}: ${yellow.active} active + ${yellow.legacy} Excel legacy). Confirm this class capacity with operations before approval.`
             )
         }
 

@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
@@ -744,6 +745,7 @@ export default async function RescheduleDetailPage({
                     </div>
 
                     <div className="overflow-hidden rounded-xl border bg-background">
+                        <TableScrollArea label="Reschedule classes">
                         <table className="w-full text-sm">
                             <thead className="bg-muted/50">
                                 <tr className="border-b">
@@ -887,6 +889,7 @@ export default async function RescheduleDetailPage({
                                 )}
                             </tbody>
                         </table>
+                        </TableScrollArea>
                     </div>
                 </div>)}
         </div>

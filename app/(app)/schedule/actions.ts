@@ -26,6 +26,11 @@ export async function generateSchedule(
     if (!user) {
         throw new Error("Unauthorized")
     }
+    const { data: profile, error: profileError } = await supabase.from("profiles")
+        .select("role,is_active").eq("id",user.id).single()
+    if (profileError || !profile?.is_active || !["admin","super_admin"].includes(profile.role)) {
+        throw new Error("Only active admins may generate a schedule")
+    }
 
     const parsed = generateSchema.safeParse({
         branch_id: formData.get("branch_id"),
@@ -57,6 +62,7 @@ export async function generateSchedule(
 
     const {
         data: existingBatch,
+        error: existingBatchError,
     } = await supabase
         .from("schedule_batches")
         .select("id, status")
@@ -64,31 +70,15 @@ export async function generateSchedule(
         .eq("schedule_month", scheduleMonth)
         .maybeSingle()
 
-    if (
-        existingBatch &&
-        existingBatch.status !== "draft"
-    ) {
-        throw new Error(
-            "Schedule already approved or locked"
-        )
-    }
-
-    /*
-     * Kalau draft lama ada,
-     * delete dulu dan regenerate clean.
-     *
-     * class_sessions + bookings cascade delete.
-     */
-
+    // Hard fail closed: no schedule with existing class IDs is ever regenerated.
+    if (existingBatchError) throw new Error(existingBatchError.message)
     if (existingBatch) {
-        const { error } = await supabase
-            .from("schedule_batches")
-            .delete()
-            .eq("id", existingBatch.id)
-
-        if (error) {
-            throw new Error(error.message)
-        }
+        throw new Error("A monthly schedule already exists for this branch. Open it instead. Regeneration is disabled to preserve class IDs and bookings.")
+    }
+    const { data: branch, error: branchError } = await supabase.from("branches")
+        .select("id,is_active").eq("id",branch_id).single()
+    if (branchError || !branch?.is_active) {
+        throw new Error("Selected branch is inactive or unavailable")
     }
 
     /*
@@ -126,17 +116,39 @@ export async function generateSchedule(
     }
 
     /*
-     * --------------------------------------------------
-     * Generate W1-W4 class sessions
-     * --------------------------------------------------
+     * Calendar V1: admin decisions are resolved BEFORE any draft is deleted.
+     * A pending closure blocks generation; a move retains its W number.
      */
+    const monthEnd = `${month}-${new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()}`
+    const { data: calendarRows, error: calendarError } = await supabase
+        .from("academic_calendar_exceptions")
+        .select("closed_on, decision, target_on")
+        .eq("branch_id", branch_id)
+        .gte("closed_on", scheduleMonth)
+        .lte("closed_on", monthEnd)
 
-    const generatedSessions =
-        generateClassSessions(
-            sessionTemplates as SessionTemplate[],
-            year,
-            monthNumber
-        )
+    if (calendarError) {
+        throw new Error(`Could not load Academic Calendar. Apply migration 016 if needed: ${calendarError.message}`)
+    }
+
+    const generatedSessions = generateClassSessions(
+        sessionTemplates as SessionTemplate[],
+        year,
+        monthNumber,
+        (calendarRows ?? []).map((row) => ({
+            closed_on: row.closed_on,
+            decision: row.decision as "pending" | "move" | "skip" | "withdrawn",
+            target_on: row.target_on,
+        }))
+    )
+
+    if (generatedSessions.length === 0) {
+        throw new Error("No classes remain after calendar decisions. Review your Academic Calendar.")
+    }
+
+    // IMPORTANT: Never delete/recreate a draft in the generation path.
+    // A new batch is the only supported safe operation until an atomic
+    // in-database generation transaction and versioned regeneration are built.
 
     /*
      * --------------------------------------------------
@@ -322,11 +334,16 @@ export async function generateSchedule(
          * half-generated schedule.
          */
 
-        await supabase
+        const { error: cleanupError } = await supabase
             .from("schedule_batches")
             .delete()
             .eq("id", batch.id)
-
+            .eq("status", "draft")
+        if (cleanupError) {
+            throw new Error("New draft creation failed and cleanup failed. Do not retry: ask a developer to inspect batch " +
+                batch.id + ". Original error: " + (error instanceof Error ? error.message : String(error)) +
+                ". Cleanup error: " + cleanupError.message)
+        }
         throw error
     }
 
