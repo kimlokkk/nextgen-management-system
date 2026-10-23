@@ -71,7 +71,7 @@ const reconciliationSchema = z.object({
     }
 })
 
-function returnToReview(view: string, status: "saved" | "error", message: string) {
+function returnToReview(view: string, status: "saved" | "error", message: string): never {
     const allowed = new Set([
         "all", "september", "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW",
         "ORIGINAL_BOOKING_MISSING", "ORIGINAL_DATE_NOT_BEFORE_TARGET",
