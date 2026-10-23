@@ -15,7 +15,8 @@ const fixture=()=>{
   batches:[{id:batch,branch_id:branch,schedule_month:"2026-10-01",status:"draft"}],
   sessions:[{id:session,schedule_batch_id:batch,branch_id:branch,programme_id:"pr",session_template_id:template,class_date:"2026-10-03",status:"scheduled",regular_capacity:15,replacement_capacity:5}],
   bookings:[{id:"r",class_session_id:session,student_id:student,enrollment_id:enrollment,booking_type:"regular",attendance_status:"upcoming"}],
-  october:[],september:[{id:"x",evidence_kind:"regular_roster"},{id:"y",evidence_kind:"legacy_replacement"}]
+  october:[],september:[{id:"x",evidence_kind:"regular_roster"},{id:"y",evidence_kind:"legacy_replacement"}],
+  reconciliations:[]
  }
 }
 test("audit never pronounces production ready just from clean local data",()=>{
@@ -28,7 +29,7 @@ test("Excel legacy plus active yellow counts accurately, but never counts it as 
  const r=audit(d)
  assert.equal(r.checks.find(x=>x.id==="capacity").status,"block")
  assert.equal(r.checks.find(x=>x.id==="capacity").count,1)
- assert.match(r.checks.find(x=>x.id==="october-history").description,/6 historical source rows/)
+ assert.match(r.checks.find(x=>x.id==="october-history").description,/6 imported source rows/)
 })
 test("explicit modern link counts a yellow reservation only once",()=>{
  const d=fixture()
@@ -43,4 +44,21 @@ test("broken active enrollment is go-live blocker",()=>{
 test("roster import missing is blocker, not false success",()=>{
  const d=fixture();d.september=[]
  assert.equal(audit(d).checks.find(x=>x.id==="september-history").status,"block")
+})
+
+test("imported source evidence is not falsely shown as fully reconciled",()=>{
+ const d=fixture()
+ d.october=[{id:"h1",target_class_id:"c",review_state:"pending",linked_active_booking_id:null}]
+ const a=audit(d)
+ assert.equal(a.checks.find(x=>x.id==="october-history").status,"pass")
+ assert.equal(a.checks.find(x=>x.id==="october-reconciliation").status,"review")
+ assert.match(a.checks.find(x=>x.id==="october-reconciliation").description,/1 has no evidence decision/)
+})
+test("source correlation is not equivalent to checked evidence",()=>{
+ const d=fixture()
+ d.october=[{id:"h1",target_class_id:"c",review_state:"pending",linked_active_booking_id:null}]
+ d.reconciliations=[{review_id:"h1",disposition:"source_correlated"}]
+ const a=audit(d)
+ assert.equal(a.checks.find(x=>x.id==="october-reconciliation").status,"review")
+ assert.match(a.checks.find(x=>x.id==="october-reconciliation").description,/1 correlated but unverified/)
 })
