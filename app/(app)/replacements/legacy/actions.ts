@@ -58,6 +58,11 @@ const reconciliationSchema = z.object({
     reference: z.string().trim().max(500),
     note: z.string().trim().min(10).max(2000),
 }).superRefine((value, context) => {
+    if (value.disposition !== "needs_investigation" && value.reference.length < 8) {
+        context.addIssue({
+            code: "custom", message: "Provide a specific evidence reference (at least 8 characters).",
+        })
+    }
     if (value.disposition === "source_checked" &&
         (!value.identityConfirmed || !value.dateConfirmed || value.reference.length < 8)) {
         context.addIssue({
