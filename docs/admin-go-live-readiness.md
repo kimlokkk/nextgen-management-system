@@ -35,3 +35,10 @@ No migrations or data writes are added by this audit screen.
 - Admin selects an existing parent after independently verifying the relationship, states father/mother/guardian and records the source. Surname/phone alone is not verification.
 - The guardian RPC locks the student, validates actor, parent and relationship, and inserts the new primary guardian link and audit entry atomically. It cannot change existing links, enrollments, bookings or attendance.
 - Apply 023 to **Supabase Local** only. Do not apply to cloud production prior to cutover review. No private data or parent names are included in the migration or tests.
+
+## November 2026 MTDC preflight (read-only; no migration)
+- `/readiness/november` previews November class sessions through the existing `generateClassSessions` engine and the current frequency/start/end enrollment rules.
+- Queries local active templates, active MTDC enrollments, student status, calendar decisions and existing November batch; simulates expected class/regular booking counts without any writes.
+- Shows structural blockers: missing templates, inactive/missing students, frequency configurations with no W1–W4, calendar errors, duplicate student enrollment in a slot, and regular capacity overflow. Also explicitly blocks recommending regeneration if ANY November batch already exists (existing `generateSchedule` deletes prior draft before rewriting).
+- Review this before any November generation. Even a clean preview does not verify actual attendance, replacements, facilitator capacity, annual closures, billing or production readiness.
+- No guardian confirmation is guessed or required for class simulation. Hadi's unknown guardian remains a separate admin-source dependency.

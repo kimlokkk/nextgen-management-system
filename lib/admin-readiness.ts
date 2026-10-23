@@ -97,7 +97,7 @@ export function assessReadiness(d:Snapshot) {
  const november=d.batches.filter(x=>x.branch_id===mt?.id&&x.schedule_month.startsWith("2026-11-"))
  add({id:"november",label:"November 2026 schedule",status:november.length?"review":"block",count:november.length,
  description:november.length?`November batch exists (${november.map(x=>x.status).join(", ")}). Manual operations sign-off still required.`:"November draft not yet prepared for MTDC.",
- href:"/schedule?prepare_month=2026-11"+(mt?.id?"&branch="+mt.id:"")})
+ href:"/readiness/november"})
  for(const [id,label,description] of [
  ["uat","Full admin UAT","One complete cycle with actual admin, including retries, role restrictions and exception handling."],
  ["backup","Backups and recovery","Production backup, a tested restore, and access-control review must be signed off."],
