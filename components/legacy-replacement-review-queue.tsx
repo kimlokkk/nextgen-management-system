@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { AlertTriangle, ArrowUpRight, ClipboardList, Search } from "lucide-react"
-import { saveLegacyReplacementReview } from "@/app/(app)/replacements/legacy/actions"
+import { saveLegacyReplacementReview, recordLegacyReconciliationDecision } from "@/app/(app)/replacements/legacy/actions"
 import { compareLegacyOriginalCandidate, type OriginalBookingCandidate, type CandidateFieldComparison } from "@/lib/legacy-source-comparison"
 import { SeptemberEvidencePanel } from "@/components/september-evidence-panel"
 import type { SeptemberComparison } from "@/lib/september-reconciliation"
@@ -52,6 +52,22 @@ const evidenceComparisonText: Record<CandidateFieldComparison, string> = {
     unavailable: "Cannot compare",
 }
 
+type SourceDecision = {
+    review_id: string
+    disposition: "needs_investigation" | "source_correlated" | "source_checked"
+    evidence_reference: string
+    decision_note: string
+    identity_confirmed: boolean
+    original_date_confirmed: boolean
+    decided_at: string
+}
+
+const reconciliationLabels: Record<string,string> = {
+    needs_investigation: "Needs further investigation",
+    source_correlated: "Source reference located — not verified",
+    source_checked: "Identity and original date checked — no entitlement approved",
+}
+
 const reviewLabels: Record<string,string> = {
     pending: "Not reviewed",
     evidence_requested: "Evidence requested",
@@ -62,6 +78,7 @@ const reviewLabels: Record<string,string> = {
 export function LegacyReplacementReviewQueue({
     rows, originalEvidenceByReview, originalBookingLookupError,
     septemberComparisonByReview, septemberLoaded, septemberError,
+    reconciliationByReview, reconciliationUnavailable, initialView,
 }: {
     rows: LegacyReplacementReview[]
     originalEvidenceByReview: Record<string, OriginalBookingCandidate | null>
@@ -69,8 +86,14 @@ export function LegacyReplacementReviewQueue({
     septemberComparisonByReview: Record<string, SeptemberComparison>
     septemberLoaded: boolean
     septemberError: boolean
+    reconciliationByReview: Record<string, SourceDecision>
+    reconciliationUnavailable: boolean
+    initialView: string
 }) {
-    const [category, setCategory] = useState("SOURCE_LINK_CANDIDATE_ADMIN_REVIEW")
+    const [category, setCategory] = useState(
+        ["september", "all", ...categories.map(x => x.value)].includes(initialView)
+            ? initialView : "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW"
+    )
     const [search, setSearch] = useState("")
     const [reviewFilter, setReviewFilter] = useState("all")
     const [page, setPage] = useState(0)
@@ -93,6 +116,9 @@ export function LegacyReplacementReviewQueue({
 
     const choose = (value: string) => { setCategory(value); setPage(0) }
     const flagged = rows.filter((item) => item.over_capacity).length
+    const checkedSources = rows.filter(item => reconciliationByReview[item.id]?.disposition === "source_checked").length
+    const investigationCount = rows.filter(item => reconciliationByReview[item.id]?.disposition === "needs_investigation").length
+    const unreviewedSources = rows.filter(item => !reconciliationByReview[item.id]).length
     const septemberOctoberRows = rows.filter((item) => item.original_date?.startsWith("2026-09-"))
     const rosterMatches = septemberOctoberRows.filter((item) =>
         (septemberComparisonByReview[item.id]?.roster.length ?? 0) > 0).length
@@ -131,6 +157,15 @@ export function LegacyReplacementReviewQueue({
                             <p className="mt-1 text-xl font-semibold tabular-nums">{item.value}</p>
                         </div>
                     ))}
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                    <p className="font-semibold">Reconciliation decisions · separate from seat reservations</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {reconciliationUnavailable
+                            ? "Decision store unavailable. Apply local migration 022; source decisions cannot be recorded."
+                            : `${checkedSources} sources checked · ${investigationCount} investigating · ${unreviewedSources} not yet reviewed.`}
+                        {" "}Source checked means identity and original date evidence were reviewed by an admin; it does not prove absence or approve a replacement.
+                    </p>
                 </div>
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
                     <p className="font-semibold">September source reconciliation · {septemberOctoberRows.length} October records</p>
@@ -308,6 +343,85 @@ export function LegacyReplacementReviewQueue({
                                 loaded={septemberLoaded}
                                 unavailable={septemberError}
                             />
+                            <details className="mt-3 rounded-lg border bg-muted/20 p-3">
+                                <summary className="cursor-pointer text-sm font-semibold">
+                                    Reconciliation decision {reconciliationByReview[item.id]
+                                        ? "· " + reconciliationLabels[reconciliationByReview[item.id].disposition]
+                                        : "· Not reviewed"}
+                                </summary>
+                                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                    Correlation means the roster/source was located; checking a source requires separate
+                                    identity and original-date verification. Neither action creates attendance or an entitlement.
+                                    Seat reservations remain unchanged even if the source is checked.
+                                </p>
+                                {reconciliationUnavailable ? (
+                                    <p className="mt-2 text-sm text-destructive">
+                                        Decisions disabled until local migration 022 is applied.
+                                    </p>
+                                ) : (
+                                    <form action={recordLegacyReconciliationDecision} className="mt-3 grid gap-3">
+                                        <input type="hidden" name="id" value={item.id}/>
+                                        <input type="hidden" name="view" value={category}/>
+                                        <input type="hidden" name="expected"
+                                            value={reconciliationByReview[item.id]?.disposition ?? ""}/>
+                                        <label className="block">
+                                            <span className="mb-1 block text-xs font-semibold">Source evidence decision</span>
+                                            <select name="disposition"
+                                                defaultValue={reconciliationByReview[item.id]?.disposition ?? "needs_investigation"}
+                                                className="h-10 w-full rounded-lg border bg-background px-3 text-sm">
+                                                <option value="needs_investigation">Needs investigation</option>
+                                                <option value="source_correlated">Source reference located (unverified)</option>
+                                                <option value="source_checked" disabled={
+                                                    item.review_state === "excluded" ||
+                                                    !item.original_date ||
+                                                    item.original_date >= item.replacement_date
+                                                }>Identity and original date checked (NOT entitlement)</option>
+                                            </select>
+                                        </label>
+                                        <label className="block">
+                                            <span className="mb-1 block text-xs font-semibold">Evidence reference</span>
+                                            <input name="evidence_reference" type="text" maxLength={500}
+                                                defaultValue={reconciliationByReview[item.id]?.evidence_reference ?? ""}
+                                                placeholder="E.g. September attendance ledger, tab and row"
+                                                className="h-10 w-full rounded-lg border bg-background px-3 text-sm"/>
+                                        </label>
+                                        <label className="flex items-start gap-2 text-xs">
+                                            <input name="identity_confirmed" type="checkbox" value="yes"
+                                                defaultChecked={reconciliationByReview[item.id]?.identity_confirmed ?? false}
+                                                className="mt-0.5 size-4 accent-primary"/>
+                                            I personally verified this student's identity against source evidence.
+                                        </label>
+                                        <label className="flex items-start gap-2 text-xs">
+                                            <input name="original_date_confirmed" type="checkbox" value="yes"
+                                                defaultChecked={reconciliationByReview[item.id]?.original_date_confirmed ?? false}
+                                                className="mt-0.5 size-4 accent-primary"/>
+                                            I personally verified the original date, including any assumed year.
+                                        </label>
+                                        <label className="block">
+                                            <span className="mb-1 block text-xs font-semibold">Decision / follow-up note</span>
+                                            <textarea name="decision_note" rows={3} required minLength={10} maxLength={2000}
+                                                defaultValue={reconciliationByReview[item.id]?.decision_note ?? ""}
+                                                placeholder="Describe the evidence reviewed, gaps, and next responsible action."
+                                                className="w-full rounded-lg border bg-background p-3 text-sm"/>
+                                        </label>
+                                        <label className="flex items-start gap-2 text-xs">
+                                            <input name="confirm_decision" type="checkbox" value="yes" required
+                                                className="mt-0.5 size-4 accent-primary"/>
+                                            Save an audited evidence decision only. I am not approving a replacement or attendance.
+                                        </label>
+                                        <button type="submit" className="ui-secondary-action w-fit">
+                                            Record reconciliation decision
+                                        </button>
+                                    </form>
+                                )}
+                                {reconciliationByReview[item.id] && (
+                                    <p className="mt-3 text-xs text-muted-foreground">
+                                        Last decided: {new Date(reconciliationByReview[item.id].decided_at)
+                                            .toLocaleString("en-MY",{ timeZone:"Asia/Kuala_Lumpur" })}.
+                                        Previous decisions remain in the audit trail.
+                                    </p>
+                                )}
+                            </details>
                             <details className="mt-3 rounded-lg border bg-muted/20 p-3">
                                 <summary className="cursor-pointer text-sm font-semibold">
                                     Evidence and admin notes

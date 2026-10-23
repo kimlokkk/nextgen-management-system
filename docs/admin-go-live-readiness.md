@@ -18,3 +18,9 @@ The `/readiness` route is read-only and restricted to active admin/super_admin a
 6. Obtain real admin sign-off for the pilot before treating NextGen as the operational system.
 
 No migrations or data writes are added by this audit screen.
+
+## Historical source decisions (migration 022, local only)
+- Independent, audited state per October legacy source: needs investigation, source correlated (unverified), or identity + original date source checked. A source check must cite specific independent evidence, have explicit identity and date confirmation, and pass chronology checks.
+- Source checks do **not** confer replacement entitlement, approve attendance, release Excel yellow reservations or approve five overcapacity sessions. The older review_state/evidence_received workflow remains separate.
+- The readiness page reports evidence import and human reconciliation as two different checks. A successful import is NOT a passed reconciliation.
+- Only migration 022 and the isolated fixture SQL integration test need to be applied to local staging; do not run on the cloud project until launch review. No real MTDC records are changed by the migration.

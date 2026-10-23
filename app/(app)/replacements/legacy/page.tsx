@@ -9,7 +9,7 @@ import {
     type LegacyReplacementReview,
 } from "@/components/legacy-replacement-review-queue"
 
-type Props = { searchParams: Promise<{ error?: string; saved?: string }> }
+type Props = { searchParams: Promise<{ error?: string; saved?: string; view?: string }> }
 
 export default async function HistoricalReplacementReviewPage({ searchParams }: Props) {
     const params = await searchParams
@@ -43,6 +43,15 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
         .order("source_ref", { ascending: true })
 
     const rows = data ?? []
+    const reviewIds = rows.map(row => row.id)
+    const reconciliationResult = reviewIds.length
+        ? await supabase.from("legacy_reconciliation_decisions")
+            .select("review_id, disposition, evidence_reference, decision_note, identity_confirmed, original_date_confirmed, decided_at")
+            .in("review_id", reviewIds)
+        : { data: [], error: null }
+    const reconciliationByReview = Object.fromEntries(
+        (reconciliationResult.data ?? []).map(d => [d.review_id, d])
+    )
 
     // Historical workbook rows are private and are loaded only by the local
     // admin importer. No data here creates entitlement, attendance or bookings.
@@ -172,9 +181,11 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                     is created. This page cannot change class attendance, capacity or bookings.
                 </p>
             </header>
-            {params.saved === "1" && (
+            {params.saved && (
                 <p role="status" className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
-                    Admin review note saved. No student booking was created or changed.
+                    {params.saved === "reconciliation"
+                        ? "Source-evidence decision recorded with audit. It does not approve entitlement, change attendance or release seats."
+                        : "Admin review note saved. No student booking was created or changed."}
                 </p>
             )}
             {params.error && (
@@ -266,6 +277,9 @@ export default async function HistoricalReplacementReviewPage({ searchParams }: 
                         septemberComparisonByReview={septemberComparisonByReview}
                         septemberLoaded={septemberLoaded}
                         septemberError={!!septemberError}
+                        reconciliationByReview={reconciliationByReview}
+                        reconciliationUnavailable={!!reconciliationResult.error}
+                        initialView={params.view ?? "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW"}
                     />
                 </>
             )}

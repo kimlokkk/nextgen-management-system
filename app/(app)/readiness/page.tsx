@@ -47,7 +47,7 @@ export default async function ReadinessPage(){
 
     let snapshot:Snapshot
     try{
-        const [students,parents,guardians,enrollments,templates,branches,batches,sessions,bookings,october,september]=await Promise.all([
+        const [students,parents,guardians,enrollments,templates,branches,batches,sessions,bookings,october,september,reconciliations]=await Promise.all([
             allRows<Snapshot["students"][number]>((a,b)=>supabase.from("students").select("id,full_name,status").order("id").range(a,b)),
             allRows<Snapshot["parents"][number]>((a,b)=>supabase.from("parents").select("id").order("id").range(a,b)),
             allRows<Snapshot["guardians"][number]>((a,b)=>supabase.from("student_guardians").select("student_id,parent_id").order("student_id").order("parent_id").range(a,b)),
@@ -59,8 +59,10 @@ export default async function ReadinessPage(){
             allRows<Snapshot["bookings"][number]>((a,b)=>supabase.from("student_bookings").select("id,class_session_id,student_id,enrollment_id,booking_type,attendance_status").order("id").range(a,b)),
             allRows<Snapshot["october"][number]>((a,b)=>supabase.from("legacy_replacement_reviews").select("id,target_class_id,review_state,linked_active_booking_id").eq("source_batch","mtdc-2026-10").order("id").range(a,b)),
             allRows<Snapshot["september"][number]>((a,b)=>supabase.from("legacy_september_evidence").select("id,evidence_kind").eq("source_batch","mtdc-2026-09").order("id").range(a,b)),
+            allRows<Snapshot["reconciliations"][number]>((a,b)=>supabase.from("legacy_reconciliation_decisions")
+                .select("review_id,disposition").order("review_id").range(a,b)),
         ])
-        snapshot={students,parents,guardians,enrollments,templates,branches,batches,sessions,bookings,october,september}
+        snapshot={students,parents,guardians,enrollments,templates,branches,batches,sessions,bookings,october,september,reconciliations}
     }catch(e){
         return <section className="rounded-xl border border-destructive/30 bg-card p-6">
             <h1 className="text-xl font-semibold">Go-live readiness · audit unavailable</h1>

@@ -12,6 +12,7 @@ export type Snapshot = {
  bookings:{id:string;class_session_id:string;student_id:string;enrollment_id:string|null;booking_type:string;attendance_status:string}[];
  october:{id:string;target_class_id:string|null;review_state:string;linked_active_booking_id:string|null}[];
  september:{id:string;evidence_kind:string}[];
+ reconciliations:{review_id:string;disposition:string}[];
 }
 const normalize=(s:string)=>s.normalize("NFKC").trim().replace(/\s+/g," ").toLowerCase()
 const occupying=(s:string)=>!["cancelled","not_scheduled","rescheduled"].includes(s)
@@ -78,9 +79,18 @@ export function assessReadiness(d:Snapshot) {
  description:`${yellowOver} yellow overcapacity sessions (active + confirmed Excel legacy) · ${regularOver} regular overcapacity sessions. No automatic override.`,href:"/replacements/legacy"})
  const noTarget=d.october.filter(x=>x.review_state!=="excluded"&&!x.target_class_id).length
  const pending=d.october.filter(x=>x.review_state==="pending").length
- add({id:"october-history",label:"October historical replacement evidence",
+ add({id:"october-history",label:"October historical source data imported",
  status:d.october.length?(noTarget?"review":"pass"):"block",count:d.october.length,
- description:`${d.october.length} historical source rows · ${pending} not reviewed · ${noTarget} non-excluded rows without a target class. History is not attendance or entitlement.`,href:"/replacements/legacy"})
+ description:`${d.october.length} imported source rows · ${noTarget} non-excluded rows without a target class. Presence in the database does not mean review is complete.`,href:"/replacements/legacy"})
+ const decisions=new Map(d.reconciliations.map(x=>[x.review_id,x.disposition]))
+ const waiting=d.october.filter(x=>!decisions.has(x.id)).length
+ const investigating=d.october.filter(x=>decisions.get(x.id)==="needs_investigation").length
+ const correlated=d.october.filter(x=>decisions.get(x.id)==="source_correlated").length
+ const checked=d.october.filter(x=>decisions.get(x.id)==="source_checked").length
+ add({id:"october-reconciliation",label:"October source reconciliation decisions",
+ status:waiting||investigating||correlated?"review":"pass",count:waiting+investigating+correlated,
+ description:`${checked} source checked · ${correlated} correlated but unverified · ${investigating} needs investigation · ${waiting} has no evidence decision. These do not represent approved replacement entitlements.`,
+ href:"/replacements/legacy"})
  const roster=d.september.filter(x=>x.evidence_kind==="regular_roster").length
  const replacement=d.september.filter(x=>x.evidence_kind==="legacy_replacement").length
  add({id:"september-history",label:"September source evidence",status:roster&&replacement?"pass":"block",
