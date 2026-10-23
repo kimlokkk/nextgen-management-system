@@ -48,7 +48,7 @@ export function assessReadiness(d:Snapshot) {
  count:nameless+duplicateGroups,description:`${nameless} missing names · ${duplicateGroups} duplicate-name groups. Never merge automatically.`,href:"/students"})
  const missingGuardian=active.filter(x=>!guardianIds.has(x.id)).length
  add({id:"guardians",label:"Parent / guardian associations",status:missingGuardian?"review":"pass",count:missingGuardian,
- description:`${missingGuardian} active students without a linked guardian. May need manual confirmation.`,href:"/parents"})
+ description:`${missingGuardian} active students without a linked guardian. May need manual confirmation.`,href:"/readiness/guardians"})
  add({id:"enrollments",label:"Active enrollment links",status:incompleteEnroll?"block":"pass",count:incompleteEnroll,
  description:`${incompleteEnroll} active enrollments have a missing/inactive student or a missing/mismatched regular class template.`,href:"/enrollments"})
  add({id:"october-schedule",label:"MTDC October baseline",status:oct.length&&regular.length?"pass":"block",

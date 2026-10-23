@@ -29,3 +29,9 @@ No migrations or data writes are added by this audit screen.
 - On historical September matching roster rows, admin can click **Use this reference** to populate the linked decision form with the exact source sheet, row and class date.
 - Choosing a reference **does not submit** the form, tick either verification checkbox, approve an entitlement, or change attendance/seat reservations.
 - Form text stays editable if operations has additional documentary references; users must still explicitly review and submit a decision.
+
+## Missing guardian links (migration 023; local only)
+- The admin readiness Guardian link check opens `/readiness/guardians`, showing active students with no relationship entries.
+- Admin selects an existing parent after independently verifying the relationship, states father/mother/guardian and records the source. Surname/phone alone is not verification.
+- The guardian RPC locks the student, validates actor, parent and relationship, and inserts the new primary guardian link and audit entry atomically. It cannot change existing links, enrollments, bookings or attendance.
+- Apply 023 to **Supabase Local** only. Do not apply to cloud production prior to cutover review. No private data or parent names are included in the migration or tests.
