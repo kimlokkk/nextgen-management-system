@@ -78,7 +78,6 @@ export function assessReadiness(d:Snapshot) {
  add({id:"capacity",label:"October class capacity",status:yellowOver+regularOver?"block":"pass",count:yellowOver+regularOver,
  description:`${yellowOver} yellow overcapacity sessions (active + confirmed Excel legacy) · ${regularOver} regular overcapacity sessions. No automatic override.`,href:"/replacements/legacy"})
  const noTarget=d.october.filter(x=>x.review_state!=="excluded"&&!x.target_class_id).length
- const pending=d.october.filter(x=>x.review_state==="pending").length
  add({id:"october-history",label:"October historical source data imported",
  status:d.october.length?(noTarget?"review":"pass"):"block",count:d.october.length,
  description:`${d.october.length} imported source rows · ${noTarget} non-excluded rows without a target class. Presence in the database does not mean review is complete.`,href:"/replacements/legacy"})
