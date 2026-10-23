@@ -97,6 +97,12 @@ export function LegacyReplacementReviewQueue({
     const [search, setSearch] = useState("")
     const [reviewFilter, setReviewFilter] = useState("all")
     const [page, setPage] = useState(0)
+    const [selectedReferences, setSelectedReferences] = useState<Record<string, string>>({})
+    const [justSelected, setJustSelected] = useState<string | null>(null)
+    const selectReference = (reviewId: string, reference: string) => {
+        setSelectedReferences(current => ({...current, [reviewId]: reference}))
+        setJustSelected(reviewId)
+    }
 
     const shown = useMemo(() => rows.filter((item) =>
         (category === "all" || (category === "september"
@@ -342,6 +348,7 @@ export function LegacyReplacementReviewQueue({
                                 evidence={septemberComparisonByReview[item.id]}
                                 loaded={septemberLoaded}
                                 unavailable={septemberError}
+                                onUseReference={(reference) => selectReference(item.id, reference)}
                             />
                             <details className="mt-3 rounded-lg border bg-muted/20 p-3">
                                 <summary className="cursor-pointer text-sm font-semibold">
@@ -381,9 +388,18 @@ export function LegacyReplacementReviewQueue({
                                         <label className="block">
                                             <span className="mb-1 block text-xs font-semibold">Evidence reference</span>
                                             <input name="evidence_reference" type="text" maxLength={500}
-                                                defaultValue={reconciliationByReview[item.id]?.evidence_reference ?? ""}
-                                                placeholder="E.g. September attendance ledger, tab and row"
+                                                value={selectedReferences[item.id] ?? reconciliationByReview[item.id]?.evidence_reference ?? ""}
+                                                onChange={(event) => {
+                                                    setSelectedReferences(current => ({...current, [item.id]: event.target.value}))
+                                                    setJustSelected(null)
+                                                }}
+                                                placeholder="Select a September row above or cite another source"
                                                 className="h-10 w-full rounded-lg border bg-background px-3 text-sm"/>
+                                            {justSelected === item.id && (
+                                                <p role="status" className="mt-1 text-xs text-primary">
+                                                    Reference filled from the selected spreadsheet row. Verify it before saving.
+                                                </p>
+                                            )}
                                         </label>
                                         <label className="flex items-start gap-2 text-xs">
                                             <input name="identity_confirmed" type="checkbox" value="yes"

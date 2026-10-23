@@ -24,3 +24,8 @@ No migrations or data writes are added by this audit screen.
 - Source checks do **not** confer replacement entitlement, approve attendance, release Excel yellow reservations or approve five overcapacity sessions. The older review_state/evidence_received workflow remains separate.
 - The readiness page reports evidence import and human reconciliation as two different checks. A successful import is NOT a passed reconciliation.
 - Only migration 022 and the isolated fixture SQL integration test need to be applied to local staging; do not run on the cloud project until launch review. No real MTDC records are changed by the migration.
+
+## Evidence reference selection UX
+- On historical September matching roster rows, admin can click **Use this reference** to populate the linked decision form with the exact source sheet, row and class date.
+- Choosing a reference **does not submit** the form, tick either verification checkbox, approve an entitlement, or change attendance/seat reservations.
+- Form text stays editable if operations has additional documentary references; users must still explicitly review and submit a decision.

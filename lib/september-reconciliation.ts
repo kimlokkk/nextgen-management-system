@@ -42,3 +42,8 @@ export function compareSeptemberEvidence(
             && x.original_date===originalDate && key(x.student_name)===key(studentName)),
     }
 }
+
+// Pure provenance formatter; reference text is never a verification decision.
+export function formatSeptemberEvidenceReference(item: SeptemberEvidence): string {
+    return `MTDC September 2026 · ${item.source_tab.trim()} · row ${item.source_row} · ${item.class_date}`
+}

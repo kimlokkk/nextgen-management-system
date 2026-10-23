@@ -1,8 +1,17 @@
 "use client"
 
-import type { SeptemberComparison, SeptemberEvidence } from "@/lib/september-reconciliation"
+import {
+    formatSeptemberEvidenceReference,
+    type SeptemberComparison,
+    type SeptemberEvidence,
+} from "@/lib/september-reconciliation"
 
-function EvidenceRow({ item }: { item: SeptemberEvidence }) {
+function EvidenceRow({
+    item, onUseEvidence,
+}: {
+    item: SeptemberEvidence
+    onUseEvidence?: (item: SeptemberEvidence) => void
+}) {
     return (
         <div className="min-w-0 rounded-lg border bg-background p-3 text-xs leading-5">
             <p className="font-semibold text-foreground">{item.student_name}</p>
@@ -10,19 +19,31 @@ function EvidenceRow({ item }: { item: SeptemberEvidence }) {
             <p>Class: {item.class_date} · {item.start_time.slice(0,5)}–{item.end_time.slice(0,5)}</p>
             <p>{item.space_label ?? "Space unknown"} · {item.course ?? "Course unknown"}</p>
             <p>Module/activity cell: {item.module_raw?.trim() || "Blank (meaning unknown)"}</p>
+            {onUseEvidence && (
+                <button type="button" onClick={() => onUseEvidence(item)}
+                    aria-label={`Use evidence from ${item.source_tab}, row ${item.source_row}, ${item.class_date}`}
+                    className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-primary/25
+                        bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10">
+                    Use this reference →
+                </button>
+            )}
         </div>
     )
 }
 
 export function SeptemberEvidencePanel({
-    originalDate, evidence, loaded, unavailable,
+    originalDate, evidence, loaded, unavailable, onUseReference,
 }: {
     originalDate: string | null
+    onUseReference?: (reference: string) => void
     evidence?: SeptemberComparison
     loaded: boolean
     unavailable: boolean
 }) {
     if (!originalDate?.startsWith("2026-09-")) return null
+    const choose = onUseReference
+        ? (item: SeptemberEvidence) => onUseReference(formatSeptemberEvidenceReference(item))
+        : undefined
     return (
         <section className="mt-3 min-w-0 rounded-xl border border-primary/20 bg-primary/5 p-3"
             aria-label="September historical source evidence">
@@ -30,6 +51,7 @@ export function SeptemberEvidencePanel({
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 A roster listing is not proof of attendance, absence or an earned replacement.
                 Activity/module cells are not interpreted as attendance. All matching is a lead for human review.
+                Choose a source row to fill the reference field below; no decision is saved automatically.
             </p>
             {unavailable ? (
                 <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
@@ -54,7 +76,8 @@ export function SeptemberEvidencePanel({
                                 </p>
                             )}
                             <div className="grid gap-2 sm:grid-cols-2">
-                                {evidence.roster.map((entry) => <EvidenceRow key={entry.source_ref} item={entry}/>)}
+                                {evidence.roster.map((entry) => <EvidenceRow key={entry.source_ref} item={entry}
+                                    onUseEvidence={choose}/>)}
                             </div>
                         </>
                     ) : evidence.possibleNameVariation.length ? (
@@ -63,7 +86,8 @@ export function SeptemberEvidencePanel({
                                 No exact-name roster candidate. Similar shortened name found — identity review required.
                             </p>
                             <div className="grid gap-2 sm:grid-cols-2">
-                                {evidence.possibleNameVariation.map((entry) => <EvidenceRow key={entry.source_ref} item={entry}/>)}
+                                {evidence.possibleNameVariation.map((entry) => <EvidenceRow key={entry.source_ref} item={entry}
+                                    onUseEvidence={choose}/>)}
                             </div>
                         </>
                     ) : (

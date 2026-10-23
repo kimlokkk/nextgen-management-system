@@ -33,3 +33,11 @@ test("replacement record cannot stand for regular class/earned entitlement",()=>
 test("other months are ignored",()=>{
  assert.equal(compare("AMIR SAMPLE BIN TEST","2026-08-05",[e()]).roster.length,0)
 })
+
+test("source reference formatter uses EXACT source tab, row and date",()=>{
+ const value=m.exports.formatSeptemberEvidenceReference(e({
+  source_tab:"SAT 11-12.30PM", source_row:12, class_date:"2026-09-26"
+ }))
+ assert.equal(value,"MTDC September 2026 · SAT 11-12.30PM · row 12 · 2026-09-26")
+ assert.equal(value.includes("row 15"),false)
+})
