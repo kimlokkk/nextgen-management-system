@@ -12,6 +12,7 @@ import {
     RefreshCw,
     RotateCcw,
     Settings2,
+    ClipboardCheck,
     UserRound,
     UsersRound,
     X,
@@ -22,7 +23,10 @@ import {
 const navigation = [
     {
         label: "Overview",
-        items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+        items: [
+            { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+            { href: "/readiness", label: "Go-live readiness", icon: ClipboardCheck },
+        ],
     },
     {
         label: "People",
