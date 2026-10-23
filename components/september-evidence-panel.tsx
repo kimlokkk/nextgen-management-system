@@ -32,10 +32,11 @@ function EvidenceRow({
 }
 
 export function SeptemberEvidencePanel({
-    originalDate, evidence, loaded, unavailable, onUseReference,
+    originalDate, evidence, loaded, unavailable, onUseReference, selectedReference,
 }: {
     originalDate: string | null
     onUseReference?: (reference: string) => void
+    selectedReference?: string
     evidence?: SeptemberComparison
     loaded: boolean
     unavailable: boolean
@@ -53,6 +54,11 @@ export function SeptemberEvidencePanel({
                 Activity/module cells are not interpreted as attendance. All matching is a lead for human review.
                 Choose a source row to fill the reference field below; no decision is saved automatically.
             </p>
+            {selectedReference && (
+                <p role="status" className="mt-2 rounded-lg border border-primary/25 bg-background p-2 text-xs text-primary">
+                    Reference filled: {selectedReference}. Open Reconciliation decision below to review and save.
+                </p>
+            )}
             {unavailable ? (
                 <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">
                     September evidence table unavailable. Apply migration 021 to LOCAL database only.
