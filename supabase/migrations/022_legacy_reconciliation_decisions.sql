@@ -9,9 +9,10 @@ create table public.legacy_reconciliation_decisions (
     decision_note text not null check (char_length(btrim(decision_note)) between 10 and 2000),
     decided_by uuid references auth.users(id) on delete set null,
     decided_at timestamptz not null default now(),
+    check (disposition = 'needs_investigation'
+       or char_length(btrim(evidence_reference)) between 8 and 500),
     check (disposition <> 'source_checked' or
-      (identity_confirmed and original_date_confirmed
-       and char_length(btrim(evidence_reference)) between 8 and 500))
+      (identity_confirmed and original_date_confirmed))
 );
 create table public.legacy_reconciliation_decision_audit (
     id uuid primary key default gen_random_uuid(),
@@ -90,6 +91,11 @@ begin
     if found then v_old:=v_existing.disposition; else v_old:=null; end if;
     if v_old is distinct from p_expected_disposition then
         raise exception 'Review decision changed since page load. Refresh and retry';
+    end if;
+
+    if p_disposition in ('source_correlated','source_checked')
+       and char_length(v_evidence)<8 then
+        raise exception 'Cite the source evidence reference (minimum 8 characters)';
     end if;
 
     if p_disposition='source_checked' then
