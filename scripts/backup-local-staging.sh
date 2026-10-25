@@ -17,7 +17,7 @@ chmod 700 "$STORE"
 DIR="$(mktemp -d "$STORE/snapshot-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")"
 cleanup() { if [ "${COMPLETE:-0}" != "1" ]; then rm -rf -- "$DIR"; fi; }
 trap cleanup EXIT
-echo "Saving encrypted-at-rest-location-sensitive database snapshot in local ignored folder..."
+echo "Saving private snapshot (restricted local permissions; not encrypted by this script)..."
 pg_dump --format=custom --no-owner --no-acl --dbname="$NEXTGEN_LOCAL_DATABASE_URL" --file="$DIR/database.dump"
 pg_restore --list "$DIR/database.dump" >/dev/null
 # Portable application-only schema backup, in addition to the complete
