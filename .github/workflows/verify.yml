@@ -114,3 +114,34 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/013_replacement_lifecycle.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/014_attendance_management.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/uat_operational_journey.sql
+
+  atomic-schedule-integration:
+    name: Atomic schedule rollback and security
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simulate atomic generation and forced rollback
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_schedule_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/024_atomic_monthly_schedule_generation.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_schedule_integration.sql
