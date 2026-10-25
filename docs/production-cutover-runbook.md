@@ -76,3 +76,18 @@ The first failed `--single-transaction --exit-on-error` restore should have
 rolled back changes to the disposable drill DB. Check that with a read-only
 catalog query before attempting any other recovery drill. Never reset the
 actual local database containing November's imported draft.
+
+## Source vs recovery lab preflight (after 24 migrations installed)
+
+Run only from the NextGen source repository with BOTH stacks running:
+
+```bash
+cd ~/Sites/nextgen-management-system
+export NEXTGEN_LOCAL_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:24080/postgres"
+export NEXTGEN_RECOVERY_LAB_URL="postgresql://postgres:postgres@127.0.0.1:25196/postgres"
+bash scripts/recovery-lab-preflight.sh .local-backups/snapshot-20261025T074148Z-cZNJ1t
+```
+
+The script performs **no writes**. It validates localhost ports, both private archive checksums, public-only archive contents, read-only aggregate source and lab counts, 24 lab migrations, 21 lab public tables, no existing student/Auth rows and the `on_auth_user_created` trigger. It intentionally leaves migrated seed branches/programmes/templates intact; do not import application data on top of these seeded IDs without a proper plan. Treat failure as a stop condition.
+
+The preflight does NOT restore any data or verify that user logins can be recovered.
