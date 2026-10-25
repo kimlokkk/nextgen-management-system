@@ -48,6 +48,15 @@ class RestoreSafetyTests(TestCase):
         self.assertIn("Snapshot baseline mismatch: november_bookings",verify)
         self.assertNotIn("DROP TABLE",pre+verify)
 
+    def test_streaming_checksum_on_old_mac_python(self):
+        import hashlib
+        import tempfile
+        payload = b"NextGen Recovery Lab " * 120000
+        with tempfile.TemporaryDirectory() as directory:
+            file_path = Path(directory) / "synthetic-private.dump"
+            file_path.write_bytes(payload)
+            self.assertEqual(mod.sha256_file(file_path), hashlib.sha256(payload).hexdigest())
+
     def test_missing_snapshot_baseline_refused(self):
         with self.assertRaises(SystemExit):
             mod.build_guard(["students"],{"students":1})
