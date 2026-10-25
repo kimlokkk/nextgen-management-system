@@ -44,3 +44,35 @@ The GitHub `Backup/restore safety drill` CI job tests a separate **synthetic** d
 **No script in this repo runs cloud migration or changes a live database.**
 
 Sources: Supabase docs [Database Backups](https://supabase.com/docs/guides/platform/backups) and [Backup & Restore Using CLI](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore).
+
+## Correction after first real Native Runtime restore failure (2026-10-25)
+
+The original raw `pg_dump` includes Supabase-managed platform schemas such as `realtime`.
+The initial real restore failed on `realtime.list_changes` with
+`permission denied to set parameter "log_min_messages"`.
+This is not evidence of archive corruption: the SHA-256 matched, but the
+**real restore remains UNVERIFIED**.
+
+The `verify-local-restore.sh` script now checks pg_restore's table of contents
+and refuses archives containing managed Supabase schemas *before writing* to a
+disposable target. CI continues to test full archive restore with a simple
+application-only synthetic database, which does not prove Supabase recovery.
+
+`backup-local-staging.sh` now retains both the complete private archival
+`database.dump` and an additional `application-public.dump` containing only
+app-owned public objects, with its own checksum. **Neither is a full portable
+Supabase recovery artifact**: the app-only dump is missing Auth identity data,
+Storage object bytes, Realtime and platform configuration.
+
+Correct real recovery requires a **separately initialized Supabase runtime**
+with managed `auth`, `realtime`, `storage`, roles and extensions,
+and a Supabase-aware logical export/restore sequence with separately
+planned users, identities and file/object storage. See
+[Supabase Backup & Restore using CLI](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore).
+Do not restore platform internal functions into bare PostgreSQL, grant
+privileges to silence the error, or remove checks merely to get green counts.
+
+The first failed `--single-transaction --exit-on-error` restore should have
+rolled back changes to the disposable drill DB. Check that with a read-only
+catalog query before attempting any other recovery drill. Never reset the
+actual local database containing November's imported draft.

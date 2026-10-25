@@ -25,6 +25,9 @@ expected=p.joinpath("sha256.txt").read_text().split()[0]
 if actual!=expected: sys.exit("Checksum mismatch; refusing restore")
 print("Backup SHA-256 verified")
 PY
+# Never replay platform-owned auth/realtime/storage functions into empty PostgreSQL.
+# Check first, before touching the target.
+pg_restore --list "$DIR/database.dump" | python3 "$ROOT/scripts/validate-restore-archive.py"
 # Verify target is empty BEFORE issuing any restore. Do not use --clean or --create.
 EXISTING="$(psql -X -q -t -A -v ON_ERROR_STOP=1 -d "$NEXTGEN_RESTORE_DRILL_URL" -c "
   select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
