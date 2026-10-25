@@ -34,7 +34,7 @@ data=p.joinpath("database.dump").read_bytes()
 baseline=json.loads(p.joinpath("baseline.json").read_text())
 p.joinpath("sha256.txt").write_text(hashlib.sha256(data).hexdigest()+"  database.dump\n")
 app=p.joinpath("application-public.dump").read_bytes()
-p.joinpath("application-sha256.txt").write_text(hashlib.sha256(app).hexdigest()+"  application-public.dump\\n")
+p.joinpath("application-sha256.txt").write_text(hashlib.sha256(app).hexdigest()+"  application-public.dump\n")
 p.joinpath("manifest.json").write_text(json.dumps({
     "purpose":"LOCAL STAGING recovery evidence only, not proof of cloud readiness",
     "contains_private_data":True, "bytes":len(data),
