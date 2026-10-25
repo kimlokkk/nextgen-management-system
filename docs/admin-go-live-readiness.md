@@ -52,3 +52,11 @@ No migrations or data writes are added by this audit screen.
 - `/readiness/november` now separately audits the SAVED class sessions and regular student bookings against the fresh enrollment-based forecast, including class dates/times, enrollment identity, booking state and duplicates.
 - A clean overall total alone is not sufficient: two changed student IDs are a blocker even when class and booking totals still match.
 - The report never approves, locks, regenerates or changes attendance. Production release requires witnessed UAT and a snapshot/cutover strategy; the current comparison uses today's enrollment records and can fail after legitimate future changes.
+
+## UAT / approval release gates
+- `/readiness/uat` is a read-only admin checklist; its six items remain pending until an actual admin witnesses them.
+- The schedule approval form now demands a dated human decision outside the app: explicit confirmation that class dates, capacity and facilitator arrangements were checked. The server enforces this acknowledgement.
+- Lock has a separate confirmation, independently validated by the server. A blank form, stale status, failed validation or lack of admin rights cannot move state.
+- Approval now requires the compare-and-set update to return a row; a no-op/race must never be reported as successful.
+- Run disruptive attendance/replacement UAT only on an isolated database with fake fixtures. Future November attendance cannot be tested by forcing actual records into the past.
+- These changes do not approve or lock the real MTDC November schedule, resolve the Hadi Ayyash guardian source, clear the October capacity exceptions, transfer local data into cloud, or certify backup/restore.
