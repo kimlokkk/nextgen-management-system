@@ -145,3 +145,55 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_schedule_fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/024_atomic_monthly_schedule_generation.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_schedule_integration.sql
+
+  backup-restore-drill:
+    name: Backup/restore safety drill (synthetic only)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+      CI: 'true'
+      NEXTGEN_LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      NEXTGEN_RESTORE_DRILL_URL: postgresql://postgres:postgres@127.0.0.1:5432/nextgen_restore_drill_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create completely synthetic local-only source
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/backup_recovery_fixture.sql
+      - name: Backup, restore to a fresh isolated DB and compare row counts
+        run: |
+          bash scripts/backup-local-staging.sh
+          SNAP_DIR="$(find .local-backups -mindepth 1 -maxdepth 1 -type d -name 'snapshot-*' | head -n 1)"
+          test -n "$SNAP_DIR"
+          createdb -h localhost -p 5432 -U postgres nextgen_restore_drill_ci
+          bash scripts/verify-local-restore.sh "$SNAP_DIR"
+          if bash scripts/verify-local-restore.sh "$SNAP_DIR"; then
+            echo 'ERROR: restore into non-empty database was allowed' >&2
+            exit 1
+          fi
+          if NEXTGEN_RESTORE_DRILL_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres \
+             python3 scripts/local-backup-guard.py restore; then
+            echo 'ERROR: restoring into the postgres source would be accepted' >&2
+            exit 1
+          fi
+          if NEXTGEN_LOCAL_DATABASE_URL=postgresql://postgres:postgres@production.example:5432/postgres \
+             python3 scripts/local-backup-guard.py source; then
+            echo 'ERROR: remote production backup was accepted as local' >&2
+            exit 1
+          fi

@@ -102,7 +102,7 @@ export function assessReadiness(d:Snapshot) {
  ["uat","Full admin UAT","Witness full admin workflows in disposable staging; MTDC November draft must stay untouched."],
  ["backup","Backups and recovery","Production backup, a tested restore, and access-control review must be signed off."],
  ["deployment","Production data cutover","September/October imports and enrollments are LOCAL. Cloud data migration, hosting and credentials require explicit controlled deployment."]
- ]) add({id,label,description,status:"manual",...(id==="uat"?{href:"/readiness/uat"}:{})})
+ ]) add({id,label,description,status:"manual",...(id==="uat"?{href:"/readiness/uat"}:id==="backup"||id==="deployment"?{href:"/readiness/recovery"}:{})})
  return {
   metrics:[
    {label:"Students",value:d.students.length},
