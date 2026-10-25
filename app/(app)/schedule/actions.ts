@@ -8,6 +8,7 @@ import {
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { getScheduleBatchValidation } from "@/lib/schedule-validation"
+import { validateScheduleTransition } from "@/lib/schedule-transition-policy"
 
 const generateSchema = z.object({
     branch_id: z.string().uuid(),
@@ -432,9 +433,12 @@ export async function approveSchedule(
         )
     }
 
+    const decision=validateScheduleTransition(batch.status,"approve",validation.valid,
+        formData.get("confirm_operations_review")==="yes")
+    if(decision)throw new Error(decision)
     const now = new Date().toISOString()
 
-    const { error: updateError } =
+    const { data: approvedBatch, error: updateError } =
         await supabase
             .from("schedule_batches")
             .update({
@@ -444,10 +448,11 @@ export async function approveSchedule(
             })
             .eq("id", batchId)
             .eq("status", "draft")
+            .select("id")
+            .maybeSingle()
 
-    if (updateError) {
-        throw new Error(updateError.message)
-    }
+    if (updateError) throw new Error(updateError.message)
+    if (!approvedBatch) throw new Error("Schedule status changed before approval. Refresh and retry.")
 
     redirect(`/schedule?batch=${batchId}`)
 }
@@ -534,6 +539,9 @@ export async function lockSchedule(
         )
     }
 
+    const decision=validateScheduleTransition(batch.status,"lock",validation.valid,
+        formData.get("confirm_final_release")==="yes")
+    if(decision)throw new Error(decision)
     const now = new Date().toISOString()
 
     const {

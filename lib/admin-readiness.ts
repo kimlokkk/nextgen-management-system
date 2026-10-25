@@ -99,10 +99,10 @@ export function assessReadiness(d:Snapshot) {
  description:november.length?`November batch exists (${november.map(x=>x.status).join(", ")}). Manual operations sign-off still required.`:"November draft not yet prepared for MTDC.",
  href:"/readiness/november"})
  for(const [id,label,description] of [
- ["uat","Full admin UAT","One complete cycle with actual admin, including retries, role restrictions and exception handling."],
+ ["uat","Full admin UAT","Witness full admin workflows in disposable staging; MTDC November draft must stay untouched."],
  ["backup","Backups and recovery","Production backup, a tested restore, and access-control review must be signed off."],
  ["deployment","Production data cutover","September/October imports and enrollments are LOCAL. Cloud data migration, hosting and credentials require explicit controlled deployment."]
- ]) add({id,label,description,status:"manual"})
+ ]) add({id,label,description,status:"manual",...(id==="uat"?{href:"/readiness/uat"}:{})})
  return {
   metrics:[
    {label:"Students",value:d.students.length},

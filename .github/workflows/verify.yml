@@ -24,7 +24,7 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Unit test calendar and timetable labels
-        run: node --test tests/scheduling-calendar.test.cjs tests/schedule-display.test.cjs tests/yellow-seat-usage.test.cjs tests/legacy-source-comparison.test.cjs tests/september-reconciliation.test.cjs tests/admin-readiness.test.cjs tests/november-preflight.test.cjs tests/draft-regeneration-safety.test.cjs tests/november-draft-audit.test.cjs
+        run: node --test tests/scheduling-calendar.test.cjs tests/schedule-display.test.cjs tests/yellow-seat-usage.test.cjs tests/legacy-source-comparison.test.cjs tests/september-reconciliation.test.cjs tests/admin-readiness.test.cjs tests/november-preflight.test.cjs tests/draft-regeneration-safety.test.cjs tests/november-draft-audit.test.cjs tests/schedule-transition-policy.test.cjs
       - name: Build
         run: npm run build
 

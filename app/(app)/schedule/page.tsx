@@ -305,8 +305,12 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                                 </div>
                                 <div className="w-full shrink-0 space-y-2 md:w-auto md:max-w-72">
                                     {selectedBatch.status === "draft" && (
-                                        <form action={approveSchedule}>
+                                        <form action={approveSchedule} className="space-y-3">
                                             <input type="hidden" name="batch_id" value={selectedBatch.id} />
+                                             <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+                                                 <input type="checkbox" name="confirm_operations_review" value="yes" required className="mt-0.5 size-4 accent-primary" />
+                                                 I verified the dates, room capacity and facilitator arrangements. Approval is not a UAT simulation.
+                                             </label>
                                             <button type="submit" disabled={!validation.valid}
                                                 className="ui-primary-action w-full disabled:cursor-not-allowed disabled:opacity-50">
                                                 Approve draft
@@ -315,8 +319,12 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                                     )}
                                     {selectedBatch.status === "approved" && (
                                         <>
-                                            <form action={lockSchedule}>
+                                            <form action={lockSchedule} className="space-y-3">
                                                 <input type="hidden" name="batch_id" value={selectedBatch.id} />
+                                             <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+                                                 <input type="checkbox" name="confirm_final_release" value="yes" required className="mt-0.5 size-4 accent-primary" />
+                                                 I verified the approved timetable for final operational release. Locking is not a UAT simulation.
+                                             </label>
                                                 <button type="submit" disabled={!validation.valid}
                                                     className="ui-primary-action w-full disabled:cursor-not-allowed disabled:opacity-50">
                                                     <LockKeyhole className="size-4" aria-hidden="true" />
