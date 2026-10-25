@@ -65,3 +65,13 @@ No migrations or data writes are added by this audit screen.
 - Separate GitHub Actions `operational-uat-smoke` job spins up ephemeral PostgreSQL, applies current replacement + attendance RPCs, uses `tests/sql/replacement_fixture.sql`, then runs `tests/sql/uat_operational_journey.sql`.
 - It checks future attendance rejection; no duplicate entitlement; yellow-seat capacity; moving seats without creating a new booking ID; release and cancel; attending a completed replacement; rescheduled original preserved while attended makeup completes; regular absence/correction; and non-admin RPC denial.
 - **This is not a browser UAT or authorization to operate real November**. All human sign-offs remain pending. It does not create/reset local databases, does not touch cloud Supabase and never reads imported student PII.
+
+## Atomic monthly schedule generation (migration 024) — supersedes earlier cleanup path
+
+- `generateSchedule` now calls only `public.generate_monthly_schedule_atomic(branch_id, first_day_of_month)`, instead of separate insert requests for batch/classes/bookings followed by best-effort cleanup.
+- A single **SECURITY INVOKER** PostgreSQL RPC checks the active admin, active branch, existing batch, active templates, eligible enrollment/student relationships, Academic Calendar move/skip/pending decisions, duplicate student assignments, and regular capacity; then inserts the batch, first four teaching weeks, and regular bookings in the **same DB transaction**.
+- Database RLS still applies. Existing draft/approved/locked batches **cannot** be regenerated, and previous months are never deleted. Postgres uniqueness is the final concurrency safeguard.
+- Any error, including an injected failure after the *second booking*, rolls back **all** writes. CI job `Atomic schedule rollback and security` verifies successful generation, moved/skipped calendar weeks, duplicates, overcapacity, non-admin/inactive-admin denial, and forced rollback on **synthetic** data in isolated PostgreSQL.
+- Earlier sections referring to delete-and-recreate or non-transactional new-draft cleanup describe the **old** generator, not current branch behavior.
+- No extra data migration or import is performed by 024. Apply it in **Supabase Local** only first. The existing MTDC November draft (48 classes, 356 bookings) remains untouched. Do not press Generate for November again.
+- Release gate remains **human admin UAT, historical capacity decisions, guardian confirmation, production data cutover and verified backup/restore**. Passing CI does not authorize deployment.
