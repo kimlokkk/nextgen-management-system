@@ -63,8 +63,9 @@ create table public.student_bookings(
 
 grant select on public.profiles to authenticated;
 grant select,update on public.branches to authenticated;
-grant select on public.students,public.programmes,public.session_templates,
-  public.enrollments,public.academic_calendar_exceptions to authenticated;
+grant select on public.students,public.programmes to authenticated;
+grant select,update on public.session_templates,public.enrollments,
+  public.academic_calendar_exceptions to authenticated;
 grant select,insert on public.schedule_batches,public.class_sessions,public.student_bookings
   to authenticated;
 -- Function must not use RLS bypass for writes.
@@ -104,7 +105,7 @@ insert into public.students values
  ('30000000-0000-4000-8000-000000000006','active');
 insert into public.session_templates values
  ('40000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001',
- '20000000-0000-4000-8000-000000000001',6,'09:00','10:30',2,5,true),
+ '20000000-0000-4000-8000-000000000001',6,'09:00','10:30',3,5,true),
  ('40000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001',
  '20000000-0000-4000-8000-000000000001',0,'11:00','12:30',1,5,true),
  ('40000000-0000-4000-8000-000000000003','10000000-0000-4000-8000-000000000002',
