@@ -26,7 +26,7 @@ def run(args, *, capture=True, **kwargs):
     if proc.returncode:
         if capture:
             # Commands only report errors, never dump payload SQL to console.
-            sys.stderr.write(proc.stderr[-3500:])
+            sys.stderr.write('Database tool returned an error. Details withheld to protect private backup rows.\n')
         raise RuntimeError(f"Command failed: {args[0]}")
     return proc.stdout if capture else ""
 
@@ -185,7 +185,7 @@ def build_guard(tables, baseline):
         EXECUTE format('SELECT exists(SELECT 1 FROM %s s LEFT JOIN %s t ON %s WHERE (%s) AND t.%I IS NULL)',
             c.conrelid::regclass,c.confrelid::regclass,join_sql,notnull_sql,ref_col)
           INTO broken;
-        IF broken THEN RAISE EXCEPTION 'Foreign key validation failed: %',c.oid::regclass; END IF;
+        IF broken THEN RAISE EXCEPTION 'Foreign key validation failed: %',c.conrelid::regclass; END IF;
       END LOOP;
     END $foreign_keys$;
     """
@@ -211,6 +211,14 @@ def main():
     if column_fingerprint(source)!=column_fingerprint(lab):
         sys.exit("STOP: source/recovery columns differ; cannot safely copy Auth + app data")
     check_lab_empty(lab)
+    # Basic Auth clone intentionally omits MFA/SSO tables. Refuse to silently
+    # downgrade existing non-password accounts in the recovery environment.
+    for protected in ("mfa_factors","sso_providers"):
+        present = query(source,"SELECT to_regclass('auth."+protected+"') IS NOT NULL")
+        if present == "t":
+            count = int(query(source,'SELECT count(*) FROM auth."'+protected+'"'))
+            if count:
+                sys.exit("STOP: source uses MFA/SSO; this basic Auth restoration plan is insufficient")
     toc=selected_toc(snap/"database.dump",set(table_names))
     print("READ-ONLY RESTORE PLAN")
     print("  Source archive: verified private snapshot")
