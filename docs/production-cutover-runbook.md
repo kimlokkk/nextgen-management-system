@@ -91,3 +91,28 @@ bash scripts/recovery-lab-preflight.sh .local-backups/snapshot-20261025T074148Z-
 The script performs **no writes**. It validates localhost ports, both private archive checksums, public-only archive contents, read-only aggregate source and lab counts, 24 lab migrations, 21 lab public tables, no existing student/Auth rows and the `on_auth_user_created` trigger. It intentionally leaves migrated seed branches/programmes/templates intact; do not import application data on top of these seeded IDs without a proper plan. Treat failure as a stop condition.
 
 The preflight does NOT restore any data or verify that user logins can be recovered.
+
+## Lab-only real app data restore (not full Supabase recovery)
+
+After the 24 migrations have been applied to the separately initialized Recovery Lab, and the read-only preflight passed, the operator can run:
+
+```bash
+cd ~/Sites/nextgen-management-system
+export NEXTGEN_LOCAL_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:24080/postgres"
+export NEXTGEN_RECOVERY_LAB_URL="postgresql://postgres:postgres@127.0.0.1:25196/postgres"
+python3 scripts/restore-recovery-lab.py .local-backups/snapshot-20261025T074148Z-cZNJ1t
+```
+
+This is a **dry run by default**. It checks the source and target schema layouts, verifies archive hashes, checks target has no existing business/Auth identities, and selects **only** the archived `TABLE DATA` for 21 public tables plus `auth.users` and `auth.identities`. The original full dump is **never replayed as schema**, so managed Realtime functions will not be re-created. It intentionally excludes live session/refresh tokens, Auth MFA data and Storage/R2 files.
+
+To perform the isolated Recovery Lab data restore **after reviewing dry-run output**, add `--apply`. It executes a *single PostgreSQL transaction* (psql `-1`): precondition checks, replaces only seeded application rows, temporarily uses `SET LOCAL session_replication_role=replica` to prevent duplicate profile triggers, imports selected Auth/application data, switches trigger behavior back, validates aggregate snapshot baselines and checks all relevant foreign-key relationships. Any error aborts the full transaction, including the seed cleanup. It only targets localhost port 25196 and never writes to the source 24080.
+
+After the transactional import passes:
+
+```bash
+python3 scripts/compare-recovery-lab.py
+```
+
+This **read-only** script compares counts and canonical row-content fingerprints for all 21 public tables plus two Auth tables against the **current LIVE source database** without exposing values. Source changes since the snapshot can cause mismatches; they must be investigated or a fresh backup taken, not dismissed.
+
+**Still pending**: actual login and role-policy UAT, Auth MFA/session configuration, Storage/R2 object bytes, and recovery with compatible production secrets/configuration. This flow establishes an application-data/UUID recovery drill only, not a certified full disaster-recovery restore.
