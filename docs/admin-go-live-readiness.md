@@ -60,3 +60,8 @@ No migrations or data writes are added by this audit screen.
 - Approval now requires the compare-and-set update to return a row; a no-op/race must never be reported as successful.
 - Run disruptive attendance/replacement UAT only on an isolated database with fake fixtures. Future November attendance cannot be tested by forcing actual records into the past.
 - These changes do not approve or lock the real MTDC November schedule, resolve the Hadi Ayyash guardian source, clear the October capacity exceptions, transfer local data into cloud, or certify backup/restore.
+
+## Disposable operations smoke UAT CI (no local migration; no MTDC data touched)
+- Separate GitHub Actions `operational-uat-smoke` job spins up ephemeral PostgreSQL, applies current replacement + attendance RPCs, uses `tests/sql/replacement_fixture.sql`, then runs `tests/sql/uat_operational_journey.sql`.
+- It checks future attendance rejection; no duplicate entitlement; yellow-seat capacity; moving seats without creating a new booking ID; release and cancel; attending a completed replacement; rescheduled original preserved while attended makeup completes; regular absence/correction; and non-admin RPC denial.
+- **This is not a browser UAT or authorization to operate real November**. All human sign-offs remain pending. It does not create/reset local databases, does not touch cloud Supabase and never reads imported student PII.

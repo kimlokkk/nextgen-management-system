@@ -51,7 +51,8 @@ export default async function UatReadinessPage() {
    <p className="mt-3 text-xs font-semibold uppercase tracking-widest text-primary">Admin-Ready V1 · Read-only</p>
    <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">End-to-end operations UAT</h1>
    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-    CI SQL fixtures cover portions of attendance and replacement logic, but witnessed admin UAT is still outstanding.
+    An isolated PostgreSQL CI scenario exercises actual attendance, replacement and reschedule procedures using synthetic records.
+    Witnessed human admin UAT is still outstanding.
     This page is a reference checklist, not a certification or a writable test environment.
    </p>
   </header>
@@ -65,6 +66,19 @@ export default async function UatReadinessPage() {
    <Link href="/readiness/november" className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">
     Review saved November draft →
    </Link>
+  </section>
+  <section className="rounded-xl border bg-card p-4 sm:p-5">
+   <h2 className="font-semibold">Automated operations smoke test</h2>
+   <p className="mt-2 text-sm leading-6 text-muted-foreground">
+    The GitHub CI job labelled Disposable operations UAT runs real database procedures on fake records:
+    future attendance rejection, planned replacement, capacity conflicts, slot changes,
+    cancellation, attendance completion, reschedule history, corrections and role restrictions.
+    The workflow result is the source of truth; this page does not automatically assert it passed.
+   </p>
+   <a href="https://github.com/kimlokkk/nextgen-management-system/actions/workflows/verify.yml"
+     target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">
+     View independent automated UAT runs →
+   </a>
   </section>
   <section className="rounded-xl border bg-card p-4 sm:p-5">
    <h2 className="font-semibold">Six acceptance gates</h2>

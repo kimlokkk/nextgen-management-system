@@ -80,3 +80,37 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/guardian_link_fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/023_guardian_link_resolution.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/guardian_link_resolution.sql
+
+  operational-uat-smoke:
+    name: Disposable operations UAT
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute synthetic class operations end to end
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/sql/replacement_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/011_replacement_initiation.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/012_replacement_assignment.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/013_replacement_lifecycle.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/014_attendance_management.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/uat_operational_journey.sql
