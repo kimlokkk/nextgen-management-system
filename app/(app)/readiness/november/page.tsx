@@ -146,7 +146,7 @@ export default async function NovemberReadinessPage(){
   {existingBatch && <section className="rounded-xl border bg-card p-4 sm:p-5">
    <h2 className="font-semibold">November stored draft audit</h2>
    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-    Compares saved sessions, class times, each student and their enrollment IDs against today's projection.
+    Compares saved sessions, class times, each student and their enrollment IDs against the current projection.
     This does not approve or lock the draft. Changes to enrollments since generation can cause a mismatch.
    </p>
    {storedAuditError ? <p role="alert" className="mt-3 text-sm text-destructive">
