@@ -242,6 +242,13 @@ jobs:
       NEXTGEN_RECOVERY_LAB_URL: postgresql://postgres:postgres@127.0.0.1:25196/postgres
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Verify macOS-compatible recovery runtime
+        run: |
+          python3 --version
+          python3 -m unittest discover -s tests -p test_recovery_lab_restore.py
       - name: Prepare two distinct synthetic Postgres environments
         run: |
           psql "$NEXTGEN_LOCAL_DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/recovery_two_stack_schema.sql
