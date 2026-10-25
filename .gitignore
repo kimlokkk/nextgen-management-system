@@ -43,3 +43,8 @@ next-env.d.ts
 
 # Private student import files MUST stay local and never enter GitHub.
 /private/
+
+# Raw local backups contain PRIVATE student/guardian/auth data. Never commit them.
+/.local-backups/
+*.dump
+*.backup
