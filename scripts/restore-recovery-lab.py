@@ -49,6 +49,18 @@ def db_url(env, expected_port):
 def query(url, sql):
     return run(["psql","-X","-q","-A","-t","-v","ON_ERROR_STOP=1","-d",url,"-c",sql]).strip()
 
+def sha256_file(path):
+    """Stream a checksum in fixed-size chunks, including on macOS Python 3.9/3.10.
+
+    hashlib.file_digest was added in Python 3.11 and cannot be assumed on Macs.
+    """
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def snapshot_path(repo_root, raw):
     root = (repo_root / ".local-backups").resolve()
     snap = Path(raw).resolve()
@@ -63,8 +75,7 @@ def snapshot_path(repo_root, raw):
         if not content.is_file() or content.is_symlink() or not digest.is_file():
             sys.exit(f"REFUSED: missing private backup/checksum {name}")
         expected = digest.read_text().split()[0]
-        with content.open("rb") as fh:
-            current = hashlib.file_digest(fh, "sha256").hexdigest()
+        current = sha256_file(content)
         if current != expected:
             sys.exit(f"REFUSED: archive integrity failed: {name}")
     base = json.loads((snap / "baseline.json").read_text())
