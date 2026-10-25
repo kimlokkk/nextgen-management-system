@@ -58,7 +58,7 @@ export function auditNovemberStoredDraft(
    session_template_id:planned.templateId,class_date:planned.date,week_number:planned.week
   }))
   expectedCount+=qualified.length
-  const expectedByStudent=new Map(qualified.map(e=>[e.student_id,e.enrollment_id??e.id]))
+  const expectedByStudent=new Map(qualified.map(e=>[e.student_id,e.id]))
   // Above is an enrollment-ID projection: actual bookings must preserve identity.
   const actual=bookingsBySession.get(s.id)??[]
   if(actual.length!==qualified.length) add("CLASS_BOOKING_COUNT",

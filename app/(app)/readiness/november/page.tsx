@@ -4,6 +4,10 @@ import { CalendarCheck2, AlertTriangle, CircleHelp, CheckCircle2 } from "lucide-
 import { createClient } from "@/lib/supabase/server"
 import { buildNovemberPreflight, type PreviewEnrollment, type PreviewStudent } from "@/lib/november-preflight"
 import type { SessionTemplate, CalendarException } from "@/lib/scheduling"
+import {
+ auditNovemberStoredDraft,
+ type DraftAuditResult, type StoredNovemberSession, type StoredNovemberBooking,
+} from "@/lib/november-draft-audit"
 
 export const dynamic = "force-dynamic"
 
@@ -67,9 +71,26 @@ export default async function NovemberReadinessPage(){
    </p>
   </section>
  }
- const report=buildNovemberPreflight({templates,enrollments,students,calendar,existingBatch})
+ const report=buildNovemberPreflight({templates,enrollments,students,calendar,existingBatch:null})
  const blockers=report.issues.filter(i=>i.level==="blocker")
  const reviews=report.issues.filter(i=>i.level==="review")
+ let storedAudit:DraftAuditResult|null=null
+ let storedAuditError:string|null=null
+ if(existingBatch){
+  try{
+   const sessions=await fetchAll<StoredNovemberSession>((a,z)=>supabase.from("class_sessions")
+    .select("id,session_template_id,class_date,week_number,start_time,end_time,regular_capacity,replacement_capacity,status")
+    .eq("schedule_batch_id",existingBatch.id).order("id").range(a,z))
+   const ids=sessions.map(s=>s.id)
+   const bookings=ids.length?await fetchAll<StoredNovemberBooking>((a,z)=>supabase.from("student_bookings")
+    .select("id,class_session_id,student_id,enrollment_id,booking_type,attendance_status")
+    .in("class_session_id",ids).order("id").range(a,z)):[]
+   storedAudit=auditNovemberStoredDraft(report.classes,enrollments,sessions,bookings)
+  }catch(err){
+   storedAuditError=err instanceof Error?err.message:"Unable to load all stored November records"
+  }
+ }
+ const snapshotReady=blockers.length===0 && storedAudit?.matching===true
  const expectedTemplateNames=new Map<string,string>()
  const {data:templateNames,error:namesError}=await supabase.from("session_templates")
   .select("id,name").eq("branch_id",mtdc.id)
@@ -81,17 +102,19 @@ export default async function NovemberReadinessPage(){
    <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-primary">MTDC · Read-only · November 2026</p>
    <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">November schedule preflight</h1>
    <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-    Forecast from active session templates, enrollment frequencies, effective dates and Academic Calendar.
-    This does NOT generate a draft, reserve seats, validate guardian relationships or change any existing history.
+    Forecast from active session templates, enrollments and Academic Calendar; if a November draft exists,
+    compare its stored sessions and individual bookings with that forecast. Read-only: no approval, changes to
+    attendance or new seat reservations.
    </p>
   </header>
   <section className="rounded-xl border bg-card p-4 sm:p-5">
    <div className="flex flex-wrap items-center gap-2">
     {blockers.length?<AlertTriangle className="size-5 text-destructive"/>:<CalendarCheck2 className="size-5 text-primary"/>}
-    <h2 className="font-semibold">{blockers.length?"November preflight blocked":"November projection completed"}</h2>
+    <h2 className="font-semibold">{blockers.length?"November projection has blockers":existingBatch?"November draft exists · projection checked":"November projection completed"}</h2>
    </div>
    <p className="mt-1 text-sm text-muted-foreground">
-    {blockers.length} blockers · {reviews.length} reviews · Requires admin sign-off before any draft is generated.
+    {blockers.length} structural blockers · {reviews.length} reviews.
+    {existingBatch?" Existing batch: "+existingBatch.status+". Regeneration remains disabled.":" Draft has not been generated yet."}
    </p>
    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
     {[
@@ -116,10 +139,48 @@ export default async function NovemberReadinessPage(){
     <CheckCircle2 className="size-4 shrink-0"/> No blocking structural issues in this projection.
    </div>}
    <p className="mt-3 text-xs leading-5 text-muted-foreground">
-    The current regeneration workflow deletes and recreates an existing draft.
-    Until hardened, do not regenerate an existing November batch, even if its status is draft.
+    Destructive regeneration is disabled at the server. Existing class and booking IDs cannot be overwritten
+    using Generate. Audit any existing draft against the expected student allocations before approval.
    </p>
   </section>
+  {existingBatch && <section className="rounded-xl border bg-card p-4 sm:p-5">
+   <h2 className="font-semibold">November stored draft audit</h2>
+   <p className="mt-1 text-xs leading-5 text-muted-foreground">
+    Compares saved sessions, class times, each student and their enrollment IDs against today's projection.
+    This does not approve or lock the draft. Changes to enrollments since generation can cause a mismatch.
+   </p>
+   {storedAuditError ? <p role="alert" className="mt-3 text-sm text-destructive">
+    Audit unavailable: {storedAuditError}. Do not approve the draft.
+   </p> : storedAudit ? <>
+    <p className={"mt-3 flex items-center gap-2 text-sm font-semibold "+(snapshotReady?"text-primary":"text-destructive")}>
+      {snapshotReady?<CheckCircle2 className="size-4"/>:<AlertTriangle className="size-4"/>}
+      {snapshotReady?"Stored draft matches the current November projection":"Stored draft needs correction before approval"}
+    </p>
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+     {[
+      ["Expected sessions",storedAudit.expectedClasses],
+      ["Saved sessions",storedAudit.actualClasses],
+      ["Expected bookings",storedAudit.expectedBookings],
+      ["Saved bookings",storedAudit.actualBookings],
+     ].map(([label,n])=><div key={label} className="rounded-lg border bg-muted/20 p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-semibold tabular-nums">{n}</p>
+     </div>)}
+    </div>
+    {storedAudit.issues.length>0&&<div className="mt-3 space-y-2">
+     {storedAudit.issues.slice(0,30).map((item,i)=><p key={item.code+i} className="text-sm text-destructive">
+       {item.code}: {item.description}
+     </p>)}
+     {storedAudit.issues.length>30&&<p className="text-xs text-muted-foreground">
+      {storedAudit.issues.length-30} more issues omitted; developer review required.
+     </p>}
+    </div>}
+    {snapshotReady&&<p className="mt-3 text-xs leading-5 text-muted-foreground">
+     UAT comparison passed for this snapshot only. Admin still needs to verify actual class dates,
+     facilitators, closures and communication before any approval. Do not lock yet.
+    </p>}
+   </> : null}
+  </section>}
   <section className="rounded-xl border bg-card p-4 sm:p-5">
    <h2 className="font-semibold">Projected sessions ({report.classCount})</h2>
    <p className="mt-1 text-xs text-muted-foreground">
@@ -149,7 +210,7 @@ export default async function NovemberReadinessPage(){
     <Link href={"/schedule?prepare_month=2026-11&branch="+mtdc.id}
      className="ui-secondary-action">Open schedule workspace →</Link>
     <span className="text-xs text-muted-foreground">
-     Opening the schedule page will not generate automatically. Keep it unapproved until UAT is completed.
+     Opening the schedule page will not generate automatically. Keep November as Draft until UAT is signed off.
     </span>
    </div>
   </section>

@@ -47,3 +47,8 @@ No migrations or data writes are added by this audit screen.
 - Schedule generation now refuses any existing branch/month batch, even a draft. The destructive `confirm_regenerate` and old delete/recreate branch have been removed; a unique database constraint still prevents concurrent duplicate batch creation.
 - A new-batch failure attempts cleanup and surfaces a prominent warning if cleanup itself fails. New-batch creation is still multi-request and must become transactionally atomic before unrestricted production release.
 - Data in earlier months is never regenerated. In particular, October's legacy sessions/attendance remain outside the new November flow.
+
+## November postgeneration draft audit
+- `/readiness/november` now separately audits the SAVED class sessions and regular student bookings against the fresh enrollment-based forecast, including class dates/times, enrollment identity, booking state and duplicates.
+- A clean overall total alone is not sufficient: two changed student IDs are a blocker even when class and booking totals still match.
+- The report never approves, locks, regenerates or changes attendance. Production release requires witnessed UAT and a snapshot/cutover strategy; the current comparison uses today's enrollment records and can fail after legitimate future changes.
