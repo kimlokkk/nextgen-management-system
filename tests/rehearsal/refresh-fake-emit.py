@@ -38,4 +38,4 @@ openpyxl.load_workbook = lambda path, **kw: pathlib.Path(path).name
 tmp = pathlib.Path(tempfile.mkdtemp())
 for f in ("students-parents.xlsx", "mtdc-oct.xlsx", "cyber-oct.xlsx", "mtdc-sept.xlsx"): (tmp / f).write_bytes(b"fake")
 plan = R.build_plan(tmp); R.report(plan)
-pathlib.Path(sys.argv[2]).write_text(R.emit_sql(plan, meta=False, oct_status="locked"))
+pathlib.Path(sys.argv[2]).write_text(R.emit_sql(plan, meta=False, oct_status="locked", november=(len(sys.argv) < 5 or sys.argv[4] != "nonov")))

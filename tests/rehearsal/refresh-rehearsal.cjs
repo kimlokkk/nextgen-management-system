@@ -3,7 +3,7 @@
 const { execFileSync } = require("child_process"), fs = require("fs"), assert = require("assert")
 const REPO = process.env.REPO, here = __dirname
 let pass = 0; const ok = (m, c, x) => { if (!c) { console.log("FAIL", m, x ?? ""); process.exitCode = 1 } else { pass++; console.log("ok  ", m) } }
-const emit = v => { const f = `/tmp/rh-${v}.sql`; execFileSync("python3", [`${here}/refresh-fake-emit.py`, v, f, REPO], { stdio: "ignore" }); return fs.readFileSync(f, "utf8") }
+const emit = (v, mode = "nov") => { const f = `/tmp/rh-${v}-${mode}.sql`; execFileSync("python3", [`${here}/refresh-fake-emit.py`, v, f, REPO, mode], { stdio: "ignore" }); return fs.readFileSync(f, "utf8") }
 module.exports = async c => {
   await c.query(`create or replace function auth.uid() returns uuid language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true),''), nullif(current_setting('test.actor', true),''))::uuid $$`)
   const one = async s => (await c.query(s)).rows[0]
@@ -59,6 +59,10 @@ module.exports = async c => {
   const n2 = await cnt(); console.log(" counts v2", JSON.stringify(n2))
   ok("run 2 replaced data (students 33 incl. 3 now roster-less, enrollments 29, reviews 3, batches 2)", n2.s === 33 && n2.e === 29 && n2.lr === 3 && n2.b === 2, n2)
   ok("kept tables untouched after run 2", (await kept()) === keptBefore)
+  // ---- no November draft (the default for the real import): admin generates it later
+  err = await run(emit("v1", "nonov")); ok("run without November commits", err === null, err)
+  const n3 = await cnt(); ok("only the October batch exists; no November classes", n3.b === 1 && (await one("select count(*)::int n from class_sessions where class_date>=date '2026-11-01'")).n === 0, n3)
+  err = await run(emit("v2")); ok("run 2 again (with November) commits", err === null, err)
   // ---- failure paths leave data intact
   const before = JSON.stringify(await cnt())
   await c.query("update session_templates set is_active=false where day_of_week=0 and start_time='11:00' and programme_id=(select id from programmes where code='YOUNG_CODER')")

@@ -163,7 +163,7 @@ def note_of(st):
     parts += st["extra"]
     return "\n".join(parts) if parts else None
 
-def emit_sql(plan, meta=True, oct_status="locked"):
+def emit_sql(plan, meta=True, oct_status="locked", november=False):
     o = []
     A = o.append
     if meta: A("\\set ON_ERROR_STOP on")
@@ -242,12 +242,12 @@ def emit_sql(plan, meta=True, oct_status="locked"):
       "cross join lateral (select count(*)::int n,(array_agg(sb.id))[1] id,(array_agg(p.code))[1] prog,(array_agg(sb.attendance_status))[1] att from public.student_bookings sb join public.class_sessions sc on sc.id=sb.class_session_id join public.programmes p on p.id=sc.programme_id where sb.student_id=i.student_id and sb.booking_type='regular' and sc.branch_id=bm.id and sc.class_date=i.original_date) ob;")
     A("update public.legacy_replacement_reviews r set over_capacity=true from public.class_sessions c where r.target_class_id=c.id and r.source_batch='mtdc-2026-10'\n"
       " and (select count(*) from public.student_bookings b where b.class_session_id=c.id and b.booking_type='replacement' and b.attendance_status not in ('cancelled','not_scheduled')) + public.legacy_reserved_yellow_seats(c.id) > c.replacement_capacity;")
-    A("select public.generate_monthly_schedule_atomic((select id from branch_map where code='MTDC'), date '2026-11-01') as november_batch;")
+    if november: A("select public.generate_monthly_schedule_atomic((select id from branch_map where code='MTDC'), date '2026-11-01') as november_batch;")
     A("do $san$ declare n int; begin\n"
       "  select count(*) into n from public.student_bookings b join public.enrollments e on e.id=b.enrollment_id where e.student_id<>b.student_id; if n>0 then raise exception 'Sanity: % bookings point at another student''s enrollment', n; end if;\n"
       "  select count(*) into n from public.student_bookings where enrollment_id is null; if n>0 then raise exception 'Sanity: % bookings without enrollment', n; end if;\n"
       "  select count(*) into n from public.student_bookings b join public.enrollments e on e.id=b.enrollment_id join public.class_sessions c on c.id=b.class_session_id where b.booking_type='regular' and e.default_session_id is distinct from c.session_template_id; if n>0 then raise exception 'Sanity: % bookings outside the enrollment default session', n; end if;\n"
-      "  select count(*) into n from public.schedule_batches where branch_id=(select id from branch_map where code='MTDC'); if n<>2 then raise exception 'Sanity: expected 2 MTDC batches, found %', n; end if;\n"
+      "  select count(*) into n from public.schedule_batches where branch_id=(select id from branch_map where code='MTDC'); if n<>" + str(2 if november else 1) + " then raise exception 'Sanity: unexpected number of MTDC batches: %', n; end if;\n"
       "end $san$;")
     A("commit;")
     return "\n".join(o) + "\n"
@@ -345,6 +345,7 @@ def main():
     ap.add_argument("--compare-old-db", action="store_true", help="read-only comparison with the current local database")
     ap.add_argument("--sql", help="emit: output file (must be inside private/)")
     ap.add_argument("--notices-csv", help="write per-student notices (contains names) to a file inside private/")
+    ap.add_argument("--november", default="skip", choices=["skip", "draft"], help="skip (default): the admin drafts November later; draft: generate a November draft now")
     ap.add_argument("--oct-batch-status", default="locked", choices=["draft", "approved", "locked"])
     ap.add_argument("--target", choices=["main", "drill"])
     ap.add_argument("--backup-snapshot"); ap.add_argument("--confirm")
@@ -372,7 +373,7 @@ def main():
         print(f"\nNotices file (contains names): {p}")
     if a.cmd == "plan":
         print("\nPlan only. Nothing was written to any database."); return
-    sql = emit_sql(plan, meta=True, oct_status=a.oct_batch_status)
+    sql = emit_sql(plan, meta=True, oct_status=a.oct_batch_status, november=(a.november == "draft"))
     if a.cmd == "emit":
         if not a.sql: sys.exit("--sql <file inside private/> is required")
         p = inside_private(a.sql); p.write_text(sql); os.chmod(p, 0o600)

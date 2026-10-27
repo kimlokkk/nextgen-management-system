@@ -21,7 +21,7 @@ const fixture=()=>{
 }
 test("audit never pronounces production ready just from clean local data",()=>{
  const r=audit(fixture());assert.equal(r.manual,3)
- assert.equal(r.checks.find(x=>x.id==="november").status,"block")
+ assert.equal(r.checks.find(x=>x.id==="november").status,"review")
 })
 test("Excel legacy plus active yellow counts accurately, but never counts it as attendance",()=>{
  const d=fixture()

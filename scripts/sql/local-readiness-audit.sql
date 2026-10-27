@@ -285,16 +285,16 @@ select 'C', 'C12', 'obligations whose SOURCE booking is in a pre-November MTDC c
        'Legacy history must not be turned into replacement entitlement automatically.'
 union all
 select 'C', 'C13', 'November 2026 MTDC schedule batches',
-       case when (select count(*) from public.schedule_batches where branch_id in (select id from mtdc) and schedule_month = date '2026-11-01') = 1 then 'PASS' else 'FAIL' end,
-       (select count(*) from public.schedule_batches where branch_id in (select id from mtdc) and schedule_month = date '2026-11-01')::text, '1',
+       case (select count(*) from public.schedule_batches where branch_id in (select id from mtdc) and schedule_month = date '2026-11-01') when 0 then 'INFO' when 1 then 'PASS' else 'FAIL' end,
+       (select count(*) from public.schedule_batches where branch_id in (select id from mtdc) and schedule_month = date '2026-11-01')::text, '0 (admin drafts it later) or 1',
        'Status: ' || coalesce((select string_agg(status, ',') from public.schedule_batches where branch_id in (select id from mtdc) and schedule_month = date '2026-11-01'), 'none') ||
-       ' | DO NOT press Generate for this month.'
+       ' | If a draft exists do not regenerate it; if none, the admin generates it from Class schedule when ready.'
 union all
 select 'C', 'C14', 'November MTDC classes',
-       case when (select count(*) from nov_cls) = 48 then 'PASS' else 'FAIL' end, (select count(*) from nov_cls)::text, '48', ''
+       case when (select count(*) from nov_cls) = 0 then 'INFO' when (select count(*) from nov_cls) = 48 then 'PASS' else 'WARN' end, (select count(*) from nov_cls)::text, '0 (no draft yet) or 48', ''
 union all
 select 'C', 'C15', 'November MTDC bookings',
-       case when (select count(*) from nov_bk) = (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc')) then 'PASS' else 'WARN' end, (select count(*) from nov_bk)::text, (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc'))::text,
+       case when (select count(*) from nov_cls) = 0 then 'INFO' when (select count(*) from nov_bk) = (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc')) then 'PASS' else 'WARN' end, (select count(*) from nov_bk)::text, (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc'))::text,
        'Bookings, not students. Same rule as C04.'
 union all
 select 'C', 'C16', 'November MTDC DISTINCT students booked', 'INFO', (select count(distinct student_id) from nov_bk)::text, 'compare with active MTDC enrollments', ''
@@ -323,8 +323,8 @@ select 'C', 'C21', 'November bookings for a student who is not active',
        (select count(*) from nov_bk b join public.students s on s.id = b.student_id where s.status <> 'active')::text, '0', ''
 union all
 select 'C', 'C22', 'active MTDC enrollments NOT booked into the November draft', 'INFO',
-       (select count(*) from act_enr e where e.branch_id in (select id from mtdc)
-          and not exists (select 1 from nov_bk b where b.enrollment_id = e.id))::text,
+       case when (select count(*) from nov_cls) = 0 then 'n/a (no November draft)' else (select count(*) from act_enr e where e.branch_id in (select id from mtdc)
+          and not exists (select 1 from nov_bk b where b.enrollment_id = e.id))::text end,
        'explain every difference', 'Should be explainable (paused, twice-monthly, new). Unexplained gaps are a blocker.'
 union all
 select 'C', 'C23', 'pending academic-calendar decisions in November 2026',

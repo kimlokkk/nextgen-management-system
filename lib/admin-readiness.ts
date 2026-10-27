@@ -95,8 +95,8 @@ export function assessReadiness(d:Snapshot) {
  add({id:"september-history",label:"September source evidence",status:roster&&replacement?"pass":"block",
  count:roster+replacement,description:`${roster} weekly roster rows · ${replacement} replacement source rows. Raw marks not interpreted as attendance.`,href:"/replacements/legacy"})
  const november=d.batches.filter(x=>x.branch_id===mt?.id&&x.schedule_month.startsWith("2026-11-"))
- add({id:"november",label:"November 2026 schedule",status:november.length?"review":"block",count:november.length,
- description:november.length?`November batch exists (${november.map(x=>x.status).join(", ")}). Manual operations sign-off still required.`:"November draft not yet prepared for MTDC.",
+ add({id:"november",label:"November 2026 schedule",status:"review",count:november.length,
+ description:november.length?`November batch exists (${november.map(x=>x.status).join(", ")}). Manual operations sign-off still required.`:"No November draft yet. This is expected: the admin creates the November draft from Class schedule when ready.",
  href:"/readiness/november"})
  for(const [id,label,description] of [
  ["uat","Full admin UAT","Witness full admin workflows in disposable staging; MTDC November draft must stay untouched."],
