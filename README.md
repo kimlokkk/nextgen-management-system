@@ -1,3 +1,16 @@
+> **NextGen project handoff — 27 October 2026**
+>
+> This repository is the NextGen operations application (not the generic starter kit pictured below). **Status: pre-production / admin pilot preparation**. Production migration and admin go-live are NOT approved.
+>
+> - [Admin pilot → company production plan](docs/production-readiness-plan-2026-10-27.md)
+> - [Claude Code executable handoff](docs/claude-code-production-prep.md)
+> - [Readiness gates](docs/admin-go-live-readiness.md)
+> - [Production cutover and recovery](docs/production-cutover-runbook.md)
+>
+> The working implementation is on PR #1 feature branch. September/October and November local staging data must be preserved; do not regenerate the November draft, reset Supabase Local or send live communications.
+>
+> ---
+>
 <a href="https://demo-nextjs-with-supabase.vercel.app/">
   <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
   <h1 align="center">Next.js and Supabase Starter Kit</h1>
