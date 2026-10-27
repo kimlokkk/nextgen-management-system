@@ -40,6 +40,8 @@ for r in rows:
 text = "\n".join(lines) + "\n"
 print(text)
 if len(sys.argv) > 2 and sys.argv[2]:
+    import os
+    os.makedirs(os.path.dirname(os.path.abspath(sys.argv[2])), exist_ok=True)
     open(sys.argv[2], "w").write(text)
     print(f"Saved: {sys.argv[2]}", file=sys.stderr)
 bad = counts["FAIL"]
