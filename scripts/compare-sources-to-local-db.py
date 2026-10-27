@@ -8,7 +8,7 @@ Needs: psql, python3, openpyxl (pip3 install --user openpyxl).
 Prints only counts. `--details` writes a human-review CSV with names; it must live under private/ (git-ignored).
 Test hook: --db-csv <file> reads the database extract from a CSV instead of running psql.
 """
-import argparse, csv, os, re, subprocess, sys, tempfile, pathlib
+import argparse, collections, csv, os, re, subprocess, sys, tempfile, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 EXTRACT = """
@@ -30,6 +30,15 @@ def looks_like_name(v): return bool(re.fullmatch(r"[A-Za-z@'.\-/() ]{5,}", str(v
 def branch_of(label):
     u = str(label or "").upper()
     return "MTDC" if "MTDC" in u else "CYBER" if "CYBER" in u else None
+
+TITLES = {"BIN","BINTI","BT","BTE","BNT","B","PUAN","PN","ENCIK","EN","CIK","DATO","DATUK","DR","HAJI","HJ","HAJAH","HJH","ENCIK"}
+def toks(x): return {t for t in norm(x).split() if t not in TITLES}
+def jac(a, b):
+    ta, tb = toks(a), toks(b)
+    return len(ta & tb) / len(ta | tb) if (ta | tb) else 0.0
+PLACEHOLDER = re.compile(r"PARENT|GUARDIAN|PENJAGA|WAKIL|UNKNOWN|TBC|TIADA|\bNA\b|\bN A\b")
+
+LINEAGE = re.compile(r"\b(BIN|BINTI|BT)\b")
 
 def load_db(args):
     if args.db_csv:
@@ -75,10 +84,16 @@ def main():
     students = {}
     for r in db:
         s = students.setdefault(key(r["student"]), {"name": r["student"], "branches": set(), "parents": {}, "phones": set(), "status": r["student_status"]})
+        s.setdefault("enr", set()).add(r["enr_status"] or "none")
         if r["branch"] and r["enr_status"] == "active": s["branches"].add(branch_of(r["branch"]))
         if r["parent"]: s["parents"][key(r["parent"])] = r["parent"]
         if r["phone"]: s["phones"].add(phone(r["phone"]))
     details = []
+    allp = {x for st_ in students.values() for x in st_["parents"].values()}
+    onew = sum(1 for x in allp if len(norm(x).split()) < 2)
+    plh = sum(1 for x in allp if PLACEHOLDER.search(norm(x)))
+    binb = sum(1 for x in allp if LINEAGE.search(norm(x)))
+    print(f"Database parents: {len(allp)} distinct names | one-word names {onew} | placeholder-looking {plh} | contain BIN/BINTI {binb}")
     print(f"Database: {len(students)} distinct students (loose-name match; spelling variants count as different)")
     for b in ("MTDC", "CYBER"):
         d = directory.get(b, []); dk = {key(n): (n, ph, par) for n, ph, par in d}
@@ -88,23 +103,33 @@ def main():
         db_branch = {k for k, s in students.items() if b in s["branches"]}
         extra = db_branch - set(dk)
         print(f"DB students with active {b} enrollment: {len(db_branch)} | not in directory sheet: {len(extra)} (DB has MORE than the sheet)")
+        sim = collections.Counter()
         pm = pd = pn = ph_same = ph_diff = ph_sheet_empty = ph_db_empty = 0
         for k, (n, ph, par) in dk.items():
             s = students.get(k)
             if not s: continue
             if not s["parents"]: pn += 1; details.append((b, "db_has_no_guardian", n, par or ""))
             elif key(par) in s["parents"]: pm += 1
-            else: pd += 1; details.append((b, "parent_name_differs", n, par or ""))
+            else:
+                pd += 1; details.append((b, "parent_name_differs", n, par or ""))
+                best = max(jac(par, x) for x in s["parents"].values())
+                sim["near(>=0.8)" if best >= 0.8 else "partial(0.4-0.8)" if best >= 0.4 else "unrelated(<0.4)"] += 1
             sp = phone(ph)
             if not sp: ph_sheet_empty += 1
             elif not s["phones"]: ph_db_empty += 1; details.append((b, "db_has_no_phone", n, ""))
             elif sp in s["phones"]: ph_same += 1
             else: ph_diff += 1; details.append((b, "phone_differs", n, ""))
         print(f"parent name vs DB guardian: same {pm} | differs {pd} | DB has no guardian {pn}")
+        if pd: print(f"  of the {pd} differing parent names: near-match {sim['near(>=0.8)']} | partial {sim['partial(0.4-0.8)']} | unrelated {sim['unrelated(<0.4)']}")
         print(f"phone vs DB parent phone: same {ph_same} | differs {ph_diff} | sheet empty {ph_sheet_empty} | DB empty but sheet has one {ph_db_empty}")
         rk = {key(n) for n in rosters.get(b, [])}
         print(f"October roster: {len(rk)} distinct | in DB with active {b} enrollment: {len(rk & db_branch)} | in DB but NO active {b} enrollment: {len({k for k in rk if k in students} - db_branch)} | not in DB at all: {len([k for k in rk if k not in students])}")
         print(f"DB active {b} enrollments whose student is NOT in the October roster: {len(db_branch - rk)}")
+        noenr = [k for k in rk if k in students and k not in db_branch]
+        if noenr:
+            st = collections.Counter(x for k in noenr for x in (students[k]["enr"] or {"none"}))
+            ss = collections.Counter(students[k]["status"] for k in noenr)
+            print(f"  roster students with no active {b} enrollment -> their enrollment statuses: {dict(st)} | student status: {dict(ss)}")
         for k in rk - db_branch: details.append((b, "in_roster_but_not_enrolled_in_db", (students.get(k) or {}).get("name", k), ""))
         for k in db_branch - rk: details.append((b, "enrolled_in_db_but_not_in_oct_roster", students[k]["name"], ""))
     if a.details:
