@@ -136,7 +136,7 @@ union all
 select 'B', 'B03', 'active students with NO guardian link',
        case when (select count(*) from act_students s where not exists (select 1 from public.student_guardians g where g.student_id = s.id)) = 0 then 'PASS' else 'WARN' end,
        (select count(*) from act_students s where not exists (select 1 from public.student_guardians g where g.student_id = s.id))::text,
-       '0 (1 known pending in the handoff)',
+       '0 (each has a NO_GUARDIAN / NOT_IN_DIRECTORY notice for the admin)',
        'Resolve only via /readiness/guardians with independent evidence. Never guess a relationship.'
 union all
 select 'B', 'B04', 'students with more than one PRIMARY guardian',
@@ -232,20 +232,18 @@ select 'C', 'C03', 'October MTDC regular sessions',
        case when (select count(*) from oct_cls) = 48 then 'PASS' else 'FAIL' end, (select count(*) from oct_cls)::text, '48', ''
 union all
 select 'C', 'C04', 'October MTDC regular bookings',
-       case when (select count(*) from oct_bk where booking_type = 'regular') = 352 then 'PASS' else 'FAIL' end,
-       (select count(*) from oct_bk where booking_type = 'regular')::text, '352', ''
+       case when (select count(*) from oct_bk where booking_type = 'regular') = (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc')) then 'PASS' else 'WARN' end,
+       (select count(*) from oct_bk where booking_type = 'regular')::text, (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc'))::text,
+       'Expected = 4 per active weekly enrollment + preferred weeks per twice-monthly one. WARN after deliberate admin changes is normal.'
 union all
 select 'C', 'C05', 'October legacy yellow-seat source rows (total)',
        case when (select count(*) from oct_rev) = 81 then 'PASS' else 'FAIL' end, (select count(*) from oct_rev)::text, '81', ''
 union all
 select 'C', 'C06', 'October legacy review queue breakdown (technical_status)',
-       case when (select count(*) filter (where technical_status = 'ORIGINAL_BOOKING_MISSING') from oct_rev) = 69
-             and (select count(*) filter (where technical_status = 'SOURCE_LINK_CANDIDATE_ADMIN_REVIEW') from oct_rev) = 7
-             and (select count(*) filter (where technical_status = 'ORIGINAL_DATE_NOT_BEFORE_TARGET') from oct_rev) = 3
-             and (select count(*) filter (where technical_status = 'MISSING_OCTOBER_ROSTER_IDENTITY') from oct_rev) = 2 then 'PASS' else 'WARN' end,
+       case when (select count(*) from oct_rev) = 81 and (select count(*) filter (where technical_status = 'ORIGINAL_DATE_UNPARSED') from oct_rev) = 0 then 'PASS' else 'WARN' end,
        coalesce((select string_agg(technical_status || '=' || n, ', ' order by technical_status) from (select technical_status, count(*) n from oct_rev group by 1) t), 'none'),
-       'ORIGINAL_BOOKING_MISSING=69, SOURCE_LINK_CANDIDATE_ADMIN_REVIEW=7, ORIGINAL_DATE_NOT_BEFORE_TARGET=3, MISSING_OCTOBER_ROSTER_IDENTITY=2',
-       'WARN = counts differ from the handoff snapshot (may be legitimate after admin decisions).'
+       'all 81 source rows classified, none unparsed',
+       'STUDENT_NOT_IN_LOCAL and MISSING_OCTOBER_ROSTER_IDENTITY rows need an admin look; the split depends on the refreshed sheets.'
 union all
 select 'C', 'C07', 'October MTDC classes where yellow usage exceeds replacement capacity',
        case when (select count(*) from yellow where used > cap) = 5 then 'WARN'
@@ -296,7 +294,8 @@ select 'C', 'C14', 'November MTDC classes',
        case when (select count(*) from nov_cls) = 48 then 'PASS' else 'FAIL' end, (select count(*) from nov_cls)::text, '48', ''
 union all
 select 'C', 'C15', 'November MTDC bookings',
-       case when (select count(*) from nov_bk) = 356 then 'PASS' else 'FAIL' end, (select count(*) from nov_bk)::text, '356', 'Bookings, not students.'
+       case when (select count(*) from nov_bk) = (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc')) then 'PASS' else 'WARN' end, (select count(*) from nov_bk)::text, (select coalesce(sum(case when e.frequency_type = 'weekly' then 4 else cardinality(e.preferred_weeks) end), 0) from public.enrollments e join public.branches b on b.id = e.branch_id where e.status = 'active' and (lower(b.name) like '%mtdc%' or lower(coalesce(b.code, '')) = 'mtdc'))::text,
+       'Bookings, not students. Same rule as C04.'
 union all
 select 'C', 'C16', 'November MTDC DISTINCT students booked', 'INFO', (select count(distinct student_id) from nov_bk)::text, 'compare with active MTDC enrollments', ''
 union all
