@@ -1,7 +1,8 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { resolveGuardianLink } from "./actions"
+import { resolveGuardianLink, resolveGuardianLinkNewParent } from "./actions"
+import { GuardianLinkList } from "@/components/guardian-link-list"
 
 export const dynamic="force-dynamic"
 type Props={searchParams:Promise<{saved?:string;error?:string}>}
@@ -20,9 +21,9 @@ export default async function MissingGuardiansPage({searchParams}:Props){
  }
 
  const [studentsResult,guardiansResult,parentsResult]=await Promise.all([
-  supabase.from("students").select("id,full_name,status").eq("status","active").order("full_name"),
+  supabase.from("students").select("id,full_name,status,notes").eq("status","active").order("full_name"),
   supabase.from("student_guardians").select("student_id,parent_id"),
-  supabase.from("parents").select("id,full_name,whatsapp_phone,phone").order("full_name"),
+  supabase.from("parents").select("id,full_name,whatsapp_phone,phone").order("full_name").limit(5000),
  ])
  const failure=[studentsResult.error,guardiansResult.error,parentsResult.error].find(Boolean)
  if(failure)return <section className="rounded-xl border border-destructive/25 bg-card p-6">
@@ -33,10 +34,14 @@ export default async function MissingGuardiansPage({searchParams}:Props){
  </section>
  const linked=new Set((guardiansResult.data??[]).map(g=>g.student_id))
  const missing=(studentsResult.data??[]).filter(s=>!linked.has(s.id))
+ const norm=(v:string)=>v.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim()
  const parents=(parentsResult.data??[]).map(p=>{
   const digits=(p.whatsapp_phone||p.phone||"").replace(/\D/g,"")
-  return {id:p.id,label:p.full_name+(digits?" · contact ending "+digits.slice(-4):" · no contact number")}
+  return {id:p.id,label:p.full_name+(digits?" · contact ending "+digits.slice(-4):" · no contact number"),
+   search:norm(p.full_name)+" "+digits}
  })
+ const rosterPhone=(notes:string|null)=>/Roster phone:\s*([0-9+ -]{6,30})/.exec(notes??"")?.[1]?.trim()??null
+ const missingStudents=missing.map(s=>({id:s.id,name:s.full_name,rosterPhone:rosterPhone(s.notes)}))
  return <div className="mx-auto max-w-4xl space-y-5">
   <header>
    <Link href="/readiness" className="text-sm font-semibold text-primary hover:underline">← Go-live readiness</Link>
@@ -58,47 +63,8 @@ export default async function MissingGuardiansPage({searchParams}:Props){
    <p className="mt-1 text-xs text-muted-foreground">Only authenticated admins can view names here. No one is linked automatically.</p>
    {!missing.length?<p className="mt-4 rounded-lg border bg-primary/5 p-4 text-sm">
     Every active student currently has at least one guardian link. This is a structural check, not independent identity verification.
-   </p>:missing.map(student=><section className="mt-4 rounded-xl border p-4" key={student.id}>
-    <h3 className="font-semibold">{student.full_name}</h3>
-    <p className="mt-1 text-xs text-muted-foreground">Active student · No guardian association in NextGen</p>
-    <form action={resolveGuardianLink} className="mt-4 grid gap-3">
-     <input type="hidden" name="student_id" value={student.id}/>
-     <label className="block">
-      <span className="mb-1 block text-xs font-semibold">Verified parent or guardian *</span>
-      <select name="parent_id" required defaultValue="" className="h-10 w-full rounded-lg border bg-background px-3 text-sm">
-       <option value="" disabled>Select after checking the enrollment source</option>
-       {parents.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}
-      </select>
-     </label>
-     <label className="block">
-      <span className="mb-1 block text-xs font-semibold">Confirmed relationship *</span>
-      <select name="relationship" required defaultValue="" className="h-10 w-full rounded-lg border bg-background px-3 text-sm">
-       <option value="" disabled>Select relationship</option>
-       <option value="father">Father</option>
-       <option value="mother">Mother</option>
-       <option value="guardian">Other legal guardian</option>
-      </select>
-     </label>
-     <label className="block">
-      <span className="mb-1 block text-xs font-semibold">Evidence reference *</span>
-      <input name="evidence_reference" type="text" required minLength={10} maxLength={500}
-       placeholder="E.g. signed enrollment sheet, tab/row and who verified it"
-       className="h-10 w-full rounded-lg border bg-background px-3 text-sm"/>
-      <span className="mt-1 block text-xs text-muted-foreground">
-       Cite the real enrollment source, avoiding unnecessary personal details.
-      </span>
-     </label>
-     <label className="flex items-start gap-2 text-xs leading-5">
-      <input type="checkbox" name="confirmed" value="yes" required className="mt-1 size-4 accent-primary"/>
-      I personally confirmed this adult is the parent/guardian named in the cited source.
-     </label>
-     <button type="submit" disabled={!parents.length}
-      className="ui-secondary-action w-fit disabled:opacity-50">Link verified guardian</button>
-     {!parents.length&&<p className="text-sm text-destructive">
-      No parent records available. <Link href="/parents" className="underline">Create the verified parent first.</Link>
-     </p>}
-    </form>
-   </section>)}
+   </p>:<GuardianLinkList students={missingStudents} parents={parents}
+    linkAction={resolveGuardianLink} newParentAction={resolveGuardianLinkNewParent}/>}
   </section>
   <p className="text-xs text-muted-foreground">
    This is an audited correction, not an import. Never choose an unrelated parent just to clear the warning.

@@ -52,7 +52,7 @@ test("imported source evidence is not falsely shown as fully reconciled",()=>{
  const a=audit(d)
  assert.equal(a.checks.find(x=>x.id==="october-history").status,"pass")
  assert.equal(a.checks.find(x=>x.id==="october-reconciliation").status,"review")
- assert.match(a.checks.find(x=>x.id==="october-reconciliation").description,/1 has no evidence decision/)
+ assert.match(a.checks.find(x=>x.id==="october-reconciliation").description,/1 not looked at yet/)
 })
 test("source correlation is not equivalent to checked evidence",()=>{
  const d=fixture()

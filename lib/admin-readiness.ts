@@ -86,9 +86,9 @@ export function assessReadiness(d:Snapshot) {
  const investigating=d.october.filter(x=>decisions.get(x.id)==="needs_investigation").length
  const correlated=d.october.filter(x=>decisions.get(x.id)==="source_correlated").length
  const checked=d.october.filter(x=>decisions.get(x.id)==="source_checked").length
- add({id:"october-reconciliation",label:"October source reconciliation decisions",
+ add({id:"october-reconciliation",label:"October replacement history: checked against the sheet",
  status:waiting||investigating||correlated?"review":"pass",count:waiting+investigating+correlated,
- description:`${checked} source checked · ${correlated} correlated but unverified · ${investigating} needs investigation · ${waiting} has no evidence decision. These do not represent approved replacement entitlements.`,
+ description:`${d.october.length} make-up rows from the October sheet, kept as history only. ${checked} checked by an admin · ${correlated} correlated but unverified (looks matched, not confirmed) · ${investigating} need a closer look · ${waiting} not looked at yet. None of these creates a new make-up entitlement.`,
  href:"/replacements/legacy"})
  const roster=d.september.filter(x=>x.evidence_kind==="regular_roster").length
  const replacement=d.september.filter(x=>x.evidence_kind==="legacy_replacement").length
