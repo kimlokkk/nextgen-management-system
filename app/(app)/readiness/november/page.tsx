@@ -85,7 +85,10 @@ export default async function NovemberReadinessPage(){
    const bookings=ids.length?await fetchAll<StoredNovemberBooking>((a,z)=>supabase.from("student_bookings")
     .select("id,class_session_id,student_id,enrollment_id,booking_type,attendance_status")
     .in("class_session_id",ids).order("id").range(a,z)):[]
-   storedAudit=auditNovemberStoredDraft(report.classes,enrollments,sessions,bookings)
+   // Count audited admin edits (migration 029). If the table is missing, treat as none.
+   const editCount=await supabase.from("draft_schedule_edits").select("id",{count:"exact",head:true})
+    .eq("schedule_batch_id",existingBatch.id).in("action",["move","remove","add"])
+   storedAudit=auditNovemberStoredDraft(report.classes,enrollments,sessions,bookings,editCount.error?0:(editCount.count??0))
   }catch(err){
    storedAuditError=err instanceof Error?err.message:"Unable to load all stored November records"
   }

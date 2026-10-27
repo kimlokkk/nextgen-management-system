@@ -32,7 +32,7 @@ jobs:
           python3 -m py_compile scripts/restore-recovery-lab.py scripts/compare-recovery-lab.py
           python3 -m unittest discover -s tests -p test_recovery_lab_restore.py
       - name: Unit test calendar and timetable labels
-        run: node --test tests/local-audit-readonly.test.cjs tests/scheduling-calendar.test.cjs tests/schedule-display.test.cjs tests/yellow-seat-usage.test.cjs tests/legacy-source-comparison.test.cjs tests/september-reconciliation.test.cjs tests/admin-readiness.test.cjs tests/november-preflight.test.cjs tests/draft-regeneration-safety.test.cjs tests/november-draft-audit.test.cjs tests/schedule-transition-policy.test.cjs tests/reschedule-atomicity.test.cjs tests/profile-role-protection.test.cjs tests/refresh-importer-safety.test.cjs tests/guardian-new-parent.test.cjs
+        run: node --test tests/local-audit-readonly.test.cjs tests/scheduling-calendar.test.cjs tests/schedule-display.test.cjs tests/yellow-seat-usage.test.cjs tests/legacy-source-comparison.test.cjs tests/september-reconciliation.test.cjs tests/admin-readiness.test.cjs tests/november-preflight.test.cjs tests/draft-regeneration-safety.test.cjs tests/november-draft-audit.test.cjs tests/schedule-transition-policy.test.cjs tests/reschedule-atomicity.test.cjs tests/profile-role-protection.test.cjs tests/refresh-importer-safety.test.cjs tests/guardian-new-parent.test.cjs tests/draft-schedule-edits.test.cjs
       - name: Build
         run: npm run build
 
@@ -185,6 +185,37 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/023_guardian_link_resolution.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/028_guardian_link_with_new_parent.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/guardian_new_parent.sql
+
+  draft-schedule-edits:
+    name: Draft schedule edits (synthetic only)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move, add, remove and reopen are admin-only, draft-only and audited
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/sql/draft_schedule_edits_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/029_draft_schedule_edits.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/draft_schedule_edits.sql
 
   atomic-reschedule-integration:
     name: Atomic reschedule lifecycle (synthetic only)

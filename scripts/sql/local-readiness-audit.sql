@@ -313,10 +313,12 @@ select 'C', 'C19', 'November bookings whose enrollment is not active, or in anot
 union all
 select 'C', 'C20', 'November regular bookings in a class that is not the enrollment default session',
        case when (select count(*) from nov_bk b join public.enrollments e on e.id = b.enrollment_id
-                  where b.booking_type = 'regular' and e.default_session_id is distinct from b.c_tpl) = 0 then 'PASS' else 'FAIL' end,
+                  where b.booking_type = 'regular' and e.default_session_id is distinct from b.c_tpl
+                    and coalesce((to_jsonb(b)->>'manually_placed')::boolean, false) = false) = 0 then 'PASS' else 'FAIL' end,
        (select count(*) from nov_bk b join public.enrollments e on e.id = b.enrollment_id
-        where b.booking_type = 'regular' and e.default_session_id is distinct from b.c_tpl)::text, '0',
-       'Every booking must match its enrollment, not only the totals.'
+        where b.booking_type = 'regular' and e.default_session_id is distinct from b.c_tpl
+                    and coalesce((to_jsonb(b)->>'manually_placed')::boolean, false) = false)::text, '0',
+       'Every booking must match its enrollment, not only the totals. Admin-placed bookings (audited manual edits) are excluded.'
 union all
 select 'C', 'C21', 'November bookings for a student who is not active',
        case when (select count(*) from nov_bk b join public.students s on s.id = b.student_id where s.status <> 'active') = 0 then 'PASS' else 'FAIL' end,

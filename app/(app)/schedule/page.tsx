@@ -16,7 +16,7 @@ import {
     type ScheduleBatchSummary,
     type ScheduleClassSummary,
 } from "@/components/schedule-workspace"
-import { approveSchedule, generateSchedule, lockSchedule } from "./actions"
+import { approveSchedule, generateSchedule, lockSchedule, reopenSchedule } from "./actions"
 
 type PageProps = {
     searchParams: Promise<{ batch?: string; prepare_month?: string; branch?: string }>
@@ -222,6 +222,32 @@ export default async function SchedulePage({ searchParams }: PageProps) {
         </div>
     )
 
+    // Audited manual changes to this month (migration 029). Missing table => show nothing.
+    const { data: editRows } = selectedBatch
+        ? await supabase.from("draft_schedule_edits")
+            .select("id, action, student_id, from_class_date, from_start_time, to_class_date, to_start_time, reason, edited_at")
+            .eq("schedule_batch_id", selectedBatch.id)
+            .order("edited_at", { ascending: false })
+            .limit(50)
+        : { data: [] }
+    const manualEdits = editRows ?? []
+    const editStudentIds = [...new Set(manualEdits.map((row) => row.student_id).filter(Boolean))] as string[]
+    const { data: editStudents } = editStudentIds.length > 0
+        ? await supabase.from("students").select("id, full_name").in("id", editStudentIds)
+        : { data: [] }
+    const editStudentName = new Map((editStudents ?? []).map((item) => [item.id, item.full_name]))
+    const editDate = (date: string | null, time: string | null) => date
+        ? `${new Intl.DateTimeFormat("en-MY", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }
+        ).format(new Date(`${date}T00:00:00Z`))} ${time?.slice(0, 5) ?? ""}`.trim()
+        : ""
+    const editLabel = (row: (typeof manualEdits)[number]) => {
+        const who = row.student_id ? editStudentName.get(row.student_id) ?? "A student" : null
+        if (row.action === "move") return `${who} moved from ${editDate(row.from_class_date, row.from_start_time)} to ${editDate(row.to_class_date, row.to_start_time)}`
+        if (row.action === "remove") return `${who} removed from ${editDate(row.from_class_date, row.from_start_time)}`
+        if (row.action === "add") return `${who} added to ${editDate(row.to_class_date, row.to_start_time)}`
+        return "Sent back to draft after approval"
+    }
+
     return (
         <div className="min-w-0 space-y-6">
             <header className="flex flex-wrap items-start justify-between gap-4">
@@ -334,6 +360,21 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                                             <p className="text-xs leading-5 text-muted-foreground">
                                                 Locking finalises this month&apos;s regular classes and prevents regeneration.
                                             </p>
+                                            <details className="rounded-lg border bg-muted/20 p-3 text-xs">
+                                                <summary className="cursor-pointer select-none font-semibold">Found a mistake? Send back to draft</summary>
+                                                <form action={reopenSchedule} className="mt-3 space-y-2">
+                                                    <input type="hidden" name="batch_id" value={selectedBatch.id} />
+                                                    <input name="reason" required minLength={10} maxLength={500}
+                                                        placeholder="Why? (at least 10 characters)"
+                                                        className="h-9 w-full rounded-lg border bg-background px-2 text-xs" />
+                                                    <label className="flex items-start gap-2 leading-5">
+                                                        <input name="confirm_reopen" type="checkbox" value="yes" required
+                                                            className="mt-0.5 size-4 accent-primary" />
+                                                        Send this month back to draft. It must be approved again before locking.
+                                                    </label>
+                                                    <button type="submit" className="ui-primary-action w-full">Send back to draft</button>
+                                                </form>
+                                            </details>
                                         </>
                                     )}
                                     {selectedBatch.status === "locked" && (
@@ -343,6 +384,31 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                                     )}
                                 </div>
                             </div>
+                        </section>
+                    )}
+                    {manualEdits.length > 0 && (
+                        <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Manual changes to this month">
+                            <details>
+                                <summary className="cursor-pointer select-none font-semibold">
+                                    Manual changes to this month · {manualEdits.length}
+                                </summary>
+                                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                    Admins changed who attends which class this month. Enrollments were not changed.
+                                </p>
+                                <ul className="mt-3 space-y-2 text-sm">
+                                    {manualEdits.map((row) => (
+                                        <li key={row.id} className="rounded-lg bg-muted/30 p-3">
+                                            <p className="font-medium">{editLabel(row)}</p>
+                                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                                {row.reason} · {new Intl.DateTimeFormat("en-MY", {
+                                                    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                                                    timeZone: "Asia/Kuala_Lumpur",
+                                                }).format(new Date(row.edited_at))}
+                                            </p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </details>
                         </section>
                     )}
                     <ScheduleClassList key={selectedBatch.id} classes={classes} />

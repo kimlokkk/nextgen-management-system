@@ -70,7 +70,8 @@ export async function getScheduleBatchValidation(
             student_id,
             enrollment_id,
             booking_type,
-            attendance_status
+            attendance_status,
+            manually_placed
         `)
             .in("class_session_id", sessionIds)
 
@@ -294,7 +295,10 @@ export async function getScheduleBatchValidation(
                     )
                 }
 
+                // An admin may deliberately place a student in another class of the
+                // same draft month. Those bookings are audited, so skip the slot match.
                 if (
+                    !booking.manually_placed &&
                     enrollment.default_session_id !==
                     session.session_template_id
                 ) {

@@ -267,3 +267,25 @@ export async function lockSchedule(
 
     redirect(`/schedule?batch=${batchId}`)
 }
+/**
+ * Send an APPROVED (not locked) month back to draft so an admin can edit it.
+ * The RPC refuses locked months, requires a reason, and writes an audit row.
+ */
+export async function reopenSchedule(formData: FormData) {
+    if (formData.get("confirm_reopen") !== "yes") throw new Error("Confirm sending the schedule back to draft")
+    const parsed = z.object({
+        batchId: z.string().uuid(),
+        reason: z.string().trim().min(10, "Explain why in at least 10 characters").max(500),
+    }).safeParse({ batchId: formData.get("batch_id"), reason: formData.get("reason") })
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid request")
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) redirect("/auth/login")
+    const { error } = await supabase.rpc("reopen_schedule_draft", {
+        p_batch_id: parsed.data.batchId,
+        p_reason: parsed.data.reason,
+    })
+    if (error) throw new Error(error.message)
+    redirect(`/schedule?batch=${parsed.data.batchId}`)
+}

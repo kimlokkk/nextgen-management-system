@@ -23,7 +23,8 @@ const hhmm=(time:string)=>time.slice(0,5)
  */
 export function auditNovemberStoredDraft(
  expected:ClassPreview[], enrollments:PreviewEnrollment[],
- actualSessions:StoredNovemberSession[], actualBookings:StoredNovemberBooking[]
+ actualSessions:StoredNovemberSession[], actualBookings:StoredNovemberBooking[],
+ manualEditCount=0
 ):DraftAuditResult {
  const issues:DraftAuditIssue[]=[]
  const add=(code:string,description:string,kind:DraftAuditIssue["kind"]="blocker")=>
@@ -84,6 +85,17 @@ export function auditNovemberStoredDraft(
   add("CLASS_TOTAL",`Stored ${actualSessions.length} classes; projection ${expected.length}`)
  if(actualBookings.length!==expectedCount)
   add("BOOKING_TOTAL",`Stored ${actualBookings.length} bookings; projection ${expectedCount}`)
+ // Admins may deliberately move, add or remove students in a draft (audited, migration 029).
+ // Who-is-booked-where then differs from the enrollment projection by design, so only those
+ // booking-level differences are downgraded to review. Timetable, duplicate, orphan and
+ // booking-state checks stay blocking.
+ const edits=Math.max(0,Math.trunc(manualEditCount)||0)
+ if(edits>0){
+  const tolerated=new Set(["CLASS_BOOKING_COUNT","WRONG_STUDENT_OR_ENROLLMENT","MISSING_STUDENT","BOOKING_TOTAL"])
+  for(const i of issues)if(i.kind==="blocker"&&tolerated.has(i.code))i.kind="review"
+  issues.unshift({kind:"review",code:"MANUAL_EDITS_RECORDED",
+   description:`${edits} admin edit(s) are recorded for this draft. Differences in who is booked where are expected; class timetable checks still apply.`})
+ }
  return {
   matching:issues.every(i=>i.kind!=="blocker"),
   expectedClasses:expected.length,actualClasses:actualSessions.length,

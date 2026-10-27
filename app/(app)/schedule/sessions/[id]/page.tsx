@@ -6,6 +6,7 @@ import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { markForReschedule, initiateReplacement, recordAttendance } from "./actions"
 import { decideClassReplacementCapacity } from "./capacity-actions"
+import { addStudentToDraft, moveStudentInDraft, removeStudentFromDraft } from "./edit-actions"
 import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import { FormSubmit } from "@/components/form-submit"
 import {
@@ -129,7 +130,8 @@ export default async function ScheduleSessionPage({
         student_id,
         enrollment_id,
         booking_type,
-        attendance_status
+        attendance_status,
+        manually_placed
       `)
             .eq("class_session_id", session.id),
     ])
@@ -241,6 +243,65 @@ export default async function ScheduleSessionPage({
             enrollment,
         ]) ?? []
     )
+
+    // =====================================================
+    // DRAFT EDIT TOOLS (migration 029): only while the month is a draft
+    // =====================================================
+
+    const canEditDraft = canAdjustDraftCapacity
+    const shortDate = (value: string) => new Intl.DateTimeFormat("en-MY", {
+        weekday: "short", day: "numeric", month: "short", timeZone: "UTC",
+    }).format(new Date(`${value}T00:00:00Z`))
+    let moveTargets: { id: string; label: string; full: boolean }[] = []
+    let addableStudents: { id: string; name: string }[] = []
+    if (canEditDraft) {
+        const { data: siblingClasses } = await supabase
+            .from("class_sessions")
+            .select("id, class_date, start_time, end_time, regular_capacity")
+            .eq("schedule_batch_id", session.schedule_batch_id)
+            .eq("programme_id", session.programme_id)
+            .eq("status", "scheduled")
+            .neq("id", session.id)
+            .order("class_date")
+            .order("start_time")
+        const siblingIds = (siblingClasses ?? []).map((item) => item.id)
+        const { data: siblingBookings } = siblingIds.length > 0
+            ? await supabase.from("student_bookings")
+                .select("class_session_id, booking_type, attendance_status")
+                .in("class_session_id", siblingIds)
+            : { data: [] }
+        const used = new Map<string, number>()
+        for (const item of siblingBookings ?? []) {
+            if (countsTowardsRegularCapacity(item)) {
+                used.set(item.class_session_id, (used.get(item.class_session_id) ?? 0) + 1)
+            }
+        }
+        moveTargets = (siblingClasses ?? []).map((item) => {
+            const count = used.get(item.id) ?? 0
+            return {
+                id: item.id,
+                full: count >= item.regular_capacity,
+                label: `${shortDate(item.class_date)} · ${item.start_time.slice(0, 5)}–${item.end_time.slice(0, 5)} · ${count}/${item.regular_capacity}`,
+            }
+        })
+
+        const { data: eligible } = await supabase
+            .from("enrollments")
+            .select("student_id")
+            .eq("branch_id", session.branch_id)
+            .eq("programme_id", session.programme_id)
+            .eq("status", "active")
+            .lte("start_date", session.class_date)
+            .or(`end_date.is.null,end_date.gte.${session.class_date}`)
+        const alreadyBooked = new Set(bookings.map((booking) => booking.student_id))
+        const candidateIds = [...new Set((eligible ?? []).map((item) => item.student_id))]
+            .filter((studentId) => !alreadyBooked.has(studentId))
+        const { data: candidates } = candidateIds.length > 0
+            ? await supabase.from("students").select("id, full_name")
+                .eq("status", "active").in("id", candidateIds).order("full_name")
+            : { data: [] }
+        addableStudents = (candidates ?? []).map((item) => ({ id: item.id, name: item.full_name }))
+    }
 
     // =====================================================
     // COUNTS
@@ -515,6 +576,52 @@ export default async function ScheduleSessionPage({
             </div>
         ) : null
 
+        const draftEditActions = canEditDraft && isRegular && !hasActiveObligation
+            && booking.attendance_status === "upcoming" ? (
+            <details className="w-full rounded-lg border bg-muted/20 p-2 text-xs">
+                <summary className="cursor-pointer select-none font-semibold">Edit this month</summary>
+                <form action={moveStudentInDraft} className="mt-2 space-y-2">
+                    <input type="hidden" name="session_id" value={session.id} />
+                    <input type="hidden" name="booking_id" value={booking.id} />
+                    <label className="block">
+                        <span className="mb-1 block font-medium">Move to another class</span>
+                        <select name="target_class_id" required defaultValue=""
+                            className="h-9 w-full rounded-lg border bg-background px-2 text-xs">
+                            <option value="" disabled>Choose a class…</option>
+                            {moveTargets.map((target) => (
+                                <option key={target.id} value={target.id} disabled={target.full}>
+                                    {target.label}{target.full ? " · full" : ""}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <input name="reason" required minLength={10} maxLength={500}
+                        placeholder="Why? (at least 10 characters)"
+                        className="h-9 w-full rounded-lg border bg-background px-2 text-xs" />
+                    <RosterActionSubmit label="Move student" />
+                </form>
+                <form action={removeStudentFromDraft} className="mt-3 space-y-2 border-t pt-2">
+                    <input type="hidden" name="session_id" value={session.id} />
+                    <input type="hidden" name="booking_id" value={booking.id} />
+                    <input name="reason" required minLength={10} maxLength={500}
+                        placeholder="Why remove? (at least 10 characters)"
+                        className="h-9 w-full rounded-lg border bg-background px-2 text-xs" />
+                    <label className="flex items-start gap-2 leading-5">
+                        <input name="confirm_remove" type="checkbox" value="yes" required
+                            className="mt-0.5 size-4 accent-primary" />
+                        Remove this student from this class for this month only.
+                    </label>
+                    <RosterActionSubmit label="Remove from this class" tone="warning" />
+                </form>
+            </details>
+        ) : null
+        const manualTag = booking.manually_placed ? (
+            <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-800 dark:text-sky-300">
+                Placed manually
+            </span>
+        ) : null
+        const extraActions = draftEditActions ?? followupActions
+
         return {
             id: booking.id,
             student: student?.full_name ?? "Student unavailable",
@@ -523,7 +630,7 @@ export default async function ScheduleSessionPage({
             enrollment: enrollment?.status ?? "—",
             attendance: booking.attendance_status,
             attendanceActions,
-            followupActions,
+            followupActions: manualTag ? <>{manualTag}{extraActions}</> : extraActions,
         }
     })
 
@@ -850,6 +957,39 @@ export default async function ScheduleSessionPage({
                 </p>
             </section>
 
+            {canEditDraft && (
+                <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Add a student to this class">
+                    <h2 className="font-semibold">Add a student to this class</h2>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        This draft month only. Enrollments do not change, so next month the student returns to their usual slot.
+                        The class must have a free regular seat, and the student must have an active enrollment for this programme.
+                    </p>
+                    {addableStudents.length === 0 ? (
+                        <p className="mt-3 text-sm text-muted-foreground">No other active students are eligible for this class.</p>
+                    ) : (
+                        <form action={addStudentToDraft} className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                            <input type="hidden" name="session_id" value={session.id} />
+                            <label className="block min-w-0">
+                                <span className="mb-1 block text-sm font-medium">Student</span>
+                                <select name="student_id" required defaultValue=""
+                                    className="h-10 w-full rounded-lg border bg-background px-2 text-sm">
+                                    <option value="" disabled>Choose a student…</option>
+                                    {addableStudents.map((item) => (
+                                        <option key={item.id} value={item.id}>{item.name}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="block min-w-0">
+                                <span className="mb-1 block text-sm font-medium">Reason</span>
+                                <input name="reason" required minLength={10} maxLength={500}
+                                    placeholder="At least 10 characters"
+                                    className="h-10 w-full rounded-lg border bg-background px-3 text-sm" />
+                            </label>
+                            <FormSubmit>Add student</FormSubmit>
+                        </form>
+                    )}
+                </section>
+            )}
             <SessionRoster entries={rosterEntries} />
         </div>
     )

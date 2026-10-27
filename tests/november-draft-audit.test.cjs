@@ -52,3 +52,16 @@ test("preview does not mutate any source",()=>{
  audit(d.expected,d.enrollments,d.sessions,d.bookings)
  assert.equal(JSON.stringify(d),before)
 })
+test("audited manual edits downgrade only booking-level differences; timetable drift still blocks",()=>{
+ const d=fixture();d.bookings[0].student_id="other"
+ const noEdits=audit(d.expected,d.enrollments,d.sessions,d.bookings)
+ assert.equal(noEdits.matching,false)
+ const withEdits=audit(d.expected,d.enrollments,d.sessions,d.bookings,2)
+ assert.equal(withEdits.matching,true)
+ assert.equal(withEdits.issues.some(x=>x.code==="MANUAL_EDITS_RECORDED"&&x.kind==="review"),true)
+ assert.equal(withEdits.issues.filter(x=>x.kind==="blocker").length,0)
+ const drift=fixture();drift.sessions[0].start_time="09:30:00"
+ assert.equal(audit(drift.expected,drift.enrollments,drift.sessions,drift.bookings,2).matching,false)
+ const dup=fixture();dup.bookings.push({...dup.bookings[0],id:"bk2"})
+ assert.equal(audit(dup.expected,dup.enrollments,dup.sessions,dup.bookings,2).matching,false,"double-booking must stay blocking")
+})
