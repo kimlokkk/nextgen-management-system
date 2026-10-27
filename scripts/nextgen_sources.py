@@ -26,6 +26,11 @@ def hhmm(h, m, ap):
     h = int(h) % 12 + (12 if ap.upper() == "PM" else 0)
     return f"{h:02d}:{int(m):02d}"
 
+def _is_black(cell):
+    f = cell.fill
+    return bool(f is not None and f.fill_type is not None and f.fgColor is not None
+                and f.fgColor.type == "rgb" and f.fgColor.rgb == "FF000000")
+
 def parse_directory(wb):
     """students-parents workbook -> {'MTDC': [row,...], 'CYBER': [...]} (row: name, phone, parent, sheet_row)."""
     out = {}
@@ -56,11 +61,12 @@ def parse_roster(wb, source):
                 if m: start, end = hhmm(*m.group(1, 2, 3)), hhmm(*m.group(4, 5, 6)); break
             if start: break
         if not start: warnings.append(f"{source}/{title}: no time range found")
-        cols = {}
+        cols, rem_cols = {}, []
         for c in range(1, ws.max_column + 1):
             h = up(ws.cell(hr, c).value)
             for want in ("AGE", "CONTACT", "LAPTOP", "COURSE"):
                 if h.startswith(want): cols[want] = c
+            if h.startswith("REMARK"): rem_cols.append(c)
         weeks = {}
         for c in range(1, ws.max_column + 1):
             t = clean(ws.cell(hr + 1, c).value)
@@ -86,5 +92,62 @@ def parse_roster(wb, source):
                              laptop=up(ws.cell(r, cols["LAPTOP"]).value) if "LAPTOP" in cols else "",
                              course=up(ws.cell(r, cols["COURSE"]).value) if "COURSE" in cols else "",
                              weeks={lab: (up(ws.cell(r, c).value), dt) for c, (lab, dt) in weeks.items() if clean(ws.cell(r, c).value)},
+                             # In-memory only, never printed or stored: free-text remarks and which week cells are blacked out.
+                             remarks=" ".join(up(ws.cell(r, c).value) for c in rem_cols),
+                             black_weeks=[lab for c, (lab, dt) in weeks.items() if lab != "PREV" and _is_black(ws.cell(r, c))],
+                             week_labels=[lab for c, (lab, dt) in weeks.items() if lab != "PREV"],
                              row=r))
     return rows, warnings
+
+
+WEEKHDR_RE = re.compile(r"WEEK\s*(\d)\s*[:\-]\s*(\d{1,2})/(\d{1,2})/(\d{2,4})", re.I)
+SLOT_RE = re.compile(r"(MORNING|AFTERNOON|EVENING|NOON)\s*[:\-]\s*(\d{1,2})[.:](\d{2})\s*(AM|PM)\s*-\s*(\d{1,2})[.:](\d{2})\s*(AM|PM)", re.I)
+SEAT_RE = re.compile(r"^\d+\.\d+$")
+
+def _parse_orig(v, year=2026):
+    import datetime
+    if v is None or clean(v) == "": return None, None
+    if isinstance(v, datetime.datetime): return v.date(), clean(v.date())
+    if isinstance(v, datetime.date): return v, clean(v)
+    s = clean(v); m = re.fullmatch(r"(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?", s)
+    if m:
+        d, mo, y = int(m.group(1)), int(m.group(2)), m.group(3)
+        yy = year if not y else (int(y) + 2000 if len(y) == 2 else int(y))
+        try: return datetime.date(yy, mo, d), s
+        except ValueError: return None, s
+    return None, s
+
+def parse_replacements(wb, source):
+    """Replacement tabs -> yellow-seat entries (historical source rows). Also returns warnings (no PII)."""
+    import datetime
+    out, warnings, norm_warn = [], [], {}
+    for ws in wb.worksheets:
+        title = clean(ws.title)
+        if "REPLACEMENT" not in up(title): continue
+        day = up(title)[:3]
+        space = 2 if ("SPACE 2" in up(title) or "CLASS REPLACEMENT" in up(title) and "SPACE 1" not in up(title)) else 1
+        wk = None; slot = None
+        for r in range(1, ws.max_row + 1):
+            cells = [clean(ws.cell(r, c).value) for c in range(1, 8)]
+            for t in cells:
+                m = WEEKHDR_RE.search(t)
+                if m:
+                    y = int(m.group(4)); y = y + 2000 if y < 100 else y
+                    wk = (int(m.group(1)), datetime.date(y, int(m.group(3)), int(m.group(2))))
+                m = SLOT_RE.search(t)
+                if m:
+                    word, h, mi = m.group(1).upper(), int(m.group(2)), int(m.group(3))
+                    h24 = (h if h >= 12 else h + 12) if word == "EVENING" else h      # the sheet has "2:00 AM" typos for EVENING
+                    st = f"{h24:02d}:{mi:02d}"
+                    en = f"{(h24 * 60 + mi + 90) // 60:02d}:{(h24 * 60 + mi + 90) % 60:02d}"   # every class is 90 minutes
+                    if hhmm(*m.group(2, 3, 4)) != st or hhmm(*m.group(5, 6, 7)) != en:
+                        norm_warn[title] = norm_warn.get(title, 0) + 1
+                    slot = (st, en)
+            if not SEAT_RE.match(cells[0]) or not looks_like_name(ws.cell(r, 2).value): continue
+            if not wk or not slot: warnings.append(f"{source}/{title} r{r}: entry before week/slot header"); continue
+            od, oraw = _parse_orig(ws.cell(r, 4).value, wk[1].year)
+            out.append(dict(source=source, tab=title, row=r, day=day, space=space, week_no=wk[0], replacement_date=wk[1],
+                            start=slot[0], end=slot[1], seat=cells[0], name=clean(ws.cell(r, 2).value), course=up(ws.cell(r, 3).value),
+                            original_date=od, original_raw=oraw, tick=clean(ws.cell(r, 5).value), module=up(ws.cell(r, 6).value)))
+    for t, n in norm_warn.items(): warnings.append(f"{source}/{t}: {n} slot header(s) had inconsistent AM/PM or length and were normalised")
+    return out, warnings
