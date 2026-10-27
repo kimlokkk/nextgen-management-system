@@ -374,7 +374,7 @@ def main():
         print(f"\nSQL written (contains personal data): {p}"); return
     # ---- apply
     if not a.target: sys.exit("--target main|drill is required")
-    if any(w.startswith(tuple(f"{b}/") for b in ("MTDC", "CYBER")) and "skipped" in w for w in plan["warnings"]):
+    if any(w.startswith(("MTDC/", "CYBER/")) and "skipped" in w for w in plan["warnings"]):
         sys.exit("Refusing: some roster rows could not be resolved (see warnings)")
     if plan.get("over_capacity"): sys.exit("Refusing: planned classes exceed template capacity; the admin must decide who moves first")
     if a.target == "drill":
