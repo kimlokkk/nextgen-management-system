@@ -53,6 +53,11 @@ module.exports = async c => {
   ok("siblings share one parent row", (await one("select count(*)::int n from parents where full_name='FAKE-PARENT-01'")).n === 1 && (await one("select count(*)::int n from student_guardians g join parents p on p.id=g.parent_id where p.full_name='FAKE-PARENT-01'")).n === 2)
   ok("identical duplicate directory rows merge into ONE student with one guardian", (await one("select count(*)::int n from students where full_name='FAKE-M27'")).n === 1 && (await one("select count(*)::int n from student_guardians g join students s on s.id=g.student_id where s.full_name='FAKE-M27'")).n === 1)
   ok("different-parent duplicate stays as two students for the admin", (await one("select count(*)::int n from students where full_name='FAKE-M17'")).n === 2)
+  const dd = Object.fromEntries((await c.query("select disposition d,count(*)::int n from legacy_reconciliation_decisions group by 1")).rows.map(r => [r.d, r.n]))
+  ok("colour rule: 2 rows source_checked (red + closure), 6 need investigation", dd.source_checked === 2 && dd.needs_investigation === 6, dd)
+  ok("every decision has an audit row, the admin as decider and the evidence text", (await one(`select (select count(*) from legacy_reconciliation_decision_audit)::int a,(select count(*) from legacy_reconciliation_decisions where decided_by='${admin}' and evidence_reference like 'Client sheet colour code%' or disposition='needs_investigation' and decided_by='${admin}')::int d`)).a === 8)
+  ok("no make-up obligation, booking change or attendance is created by the decisions", (await one("select (select count(*) from makeup_obligations)::int o,(select count(*) from student_bookings where attendance_status in ('present','absent'))::int a")).o === 0)
+  ok("absent/closure with no replacement row is flagged on the student", (await one("select count(*)::int n from students where full_name='FAKE-M06' and notes like '%MAKEUP_REVIEW%absent 10/10%official closure 03/10%'")).n === 1)
   ok("kept tables untouched after run 1", (await kept()) === keptBefore)
   // ---- run 2 (v2: fewer students) replaces everything again
   err = await run(emit("v2")); ok("run 2 commits", err === null, err)

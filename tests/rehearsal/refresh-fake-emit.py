@@ -33,6 +33,15 @@ if ver == "v2":
 S.parse_directory = lambda wb: {"MTDC": dm, "CYBER": dc}
 S.parse_roster = lambda wb, b: ({"mtdc-oct.xlsx": mt, "cyber-oct.xlsx": cy, "mtdc-sept.xlsx": [r for r in mt if r["name"] in ("FAKE-M01", "FAKE-M02")]}[wb], [])
 S.parse_replacements = lambda wb, b: (reps, [])
+R.SEPT_CSV = pathlib.Path("/nonexistent/fake-evidence.csv")
+def mk(name, date, col, txt=False): return dict(key=S.name_key(name), tab="SAT 9-10.30AM", day="SAT", date=date, source="MTDC", row=1, col=col, has_text=txt)
+marks = []
+for r in mt:
+    nm = r["name"]
+    if nm in ("FAKE-M05", "FAKE-M22"): continue
+    marks.append(mk(nm, D(2026, 10, 3), "red" if nm == "FAKE-M01" else "white" if nm == "FAKE-M11" else "black", nm == "FAKE-M11"))
+marks.append(mk("FAKE-M06", D(2026, 10, 10), "red"))
+S.parse_marks = lambda wb, b: marks if wb == "mtdc-oct.xlsx" else []
 import openpyxl
 openpyxl.load_workbook = lambda path, **kw: pathlib.Path(path).name
 tmp = pathlib.Path(tempfile.mkdtemp())

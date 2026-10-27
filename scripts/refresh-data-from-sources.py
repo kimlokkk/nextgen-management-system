@@ -56,6 +56,31 @@ def row_flags(r):
 
 def clean_phone(s): return digits(s)
 
+EVIDENCE_REF = "Client sheet colour code (red = absent, black = official NextGen closure), confirmed with the admin on 2026-10-27"
+SEPT_CSV = ROOT / "private/NextGen_MTDC_September2026_PRIVATE_Evidence.csv"
+MONTH = {9: "September", 10: "October"}
+
+def judge_review(r, cellmap, closed):
+    """Decision for one historical replacement row from the colour of its ORIGINAL class cell.
+    Returns (disposition, identity_ok, date_ok, note, code). Never creates an entitlement."""
+    inv = lambda code, note: ("needs_investigation", bool(r["student"]), False, note, code)
+    if not r["student"]: return inv("NO_STUDENT", "The student name on this make-up row was not found in the roster or directory sheets; admin to identify the child.")
+    o, t = r["original"], r["replacement"]
+    if o is None: return inv("NO_ORIGINAL_DATE", "The original class date on this row could not be read; admin to check the sheet.")
+    if t is not None and o >= t: return inv("DATE_NOT_BEFORE", "The original class date is not before the make-up date; this is probably a typing error in the sheet. Admin to check.")
+    cells = cellmap.get((r["student"]["key"], o))
+    if not cells: return inv("OUTSIDE_SHEETS", "The original class date is outside the September and October roster sheets, so the colour cannot be checked here. Admin to review.")
+    mon = MONTH.get(o.month, o.strftime("%B"))
+    if any(c["col"] == "red" for c in cells):
+        return ("source_checked", True, True, f"Original class cell is red (student absent) in the {mon} roster sheet; student and date match.", "CHECKED_ABSENT")
+    if any(c["col"] == "black" and (c["sheet"], c["date"]) in closed for c in cells):
+        return ("source_checked", True, True, f"Original class day is blacked out for everyone in the {mon} roster sheet (official NextGen closure); student and date match.", "CHECKED_CLOSURE")
+    if any(c["col"] == "black" for c in cells):
+        return inv("BLACK_NOT_CLOSURE", "Only this student's original class cell is black (not a whole-class closure day). Admin to check why.")
+    if any(c["has_text"] for c in cells):
+        return inv("ATTENDED_NOT_RED", "The original class cell is not red and has a module written, so the sheet suggests the student attended. Admin to review.")
+    return inv("BLANK_NOT_RED", "The original class cell is blank and not red. Admin to review.")
+
 def build_plan(src):
     import openpyxl
     load = lambda f: openpyxl.load_workbook(src / f, data_only=True)
@@ -68,7 +93,8 @@ def build_plan(src):
         wb = load(f); rows, w = S.parse_roster(wb, b); rosters[b] = rows; plan["warnings"] += w
         if b == "MTDC":
             repl, w2 = S.parse_replacements(wb, b); plan["warnings"] += w2
-    sept_rows, _ = S.parse_roster(load("mtdc-sept.xlsx"), "MTDC")
+    sept_wb, oct_wb = load("mtdc-sept.xlsx"), load("mtdc-oct.xlsx")
+    sept_rows, _ = S.parse_roster(sept_wb, "MTDC")
     sept_keys = {S.name_key(r["name"]) for r in sept_rows}
     students, parents, guardians, enrollments = [], {}, [], []
     by_key = {}
@@ -129,6 +155,43 @@ def build_plan(src):
                             student=st, name=e["name"], original=e["original_date"], replacement=e["replacement_date"],
                             prog="JR_MAKER" if e["space"] == 1 else "YOUNG_CODER", space=e["space"], start=e["start"], end=e["end"]))
     plan["reviews"] = reviews
+    # ---- colour marks: red = absent, black = official NextGen closure (client-confirmed)
+    marks = []
+    for sheet, wbk in (("sept", sept_wb), ("oct", oct_wb)):
+        for m in S.parse_marks(wbk, "MTDC"): m["sheet"] = sheet; marks.append(m)
+    by_day = collections.defaultdict(list); cellmap = collections.defaultdict(list)
+    for m in marks: by_day[(m["sheet"], m["date"])].append(m); cellmap[(m["key"], m["date"])].append(m)
+    closed = {k for k, v in by_day.items() if len(v) >= 10 and sum(1 for m in v if m["col"] == "black") / len(v) >= 0.6}
+    origs = {(S.name_key(e["name"]), e["original_date"]) for e in repl if e["original_date"]}
+    sept_repl, _w = S.parse_replacements(sept_wb, "MTDC")
+    origs |= {(S.name_key(e["name"]), e["original_date"]) for e in sept_repl if e["original_date"]}
+    if SEPT_CSV.exists():
+        import datetime
+        for rw in csv.DictReader(open(SEPT_CSV, encoding="utf-8-sig")):
+            if rw["evidence_kind"] == "legacy_replacement" and rw["original_date"]:
+                origs.add((S.name_key(rw["student_name"]), datetime.date.fromisoformat(rw["original_date"])))
+    else: plan["warnings"].append("September evidence CSV not found: replacement matching for September uses the sheet parser only")
+    for r in reviews: r["decision"] = judge_review(r, cellmap, closed)
+    plan["closed_days"] = sorted(str(d) for _, d in closed)
+    plan["marks"] = collections.Counter(m["col"] for m in marks)
+    absent_no = closure_no = 0
+    for (b, k), st in by_key.items():
+        if b != "MTDC": continue
+        red, clo = [], []
+        for sheet in ("sept", "oct"):
+            ms = [m for m in marks if m["key"] == k and m["sheet"] == sheet]
+            if not ms: continue
+            has_class = any(m["col"] != "black" for m in ms)   # all-black month = not attending that month, not a missed make-up
+            for m in ms:
+                if (k, m["date"]) in origs: continue
+                if m["col"] == "red": red.append(m["date"])
+                elif m["col"] == "black" and has_class and (sheet, m["date"]) in closed: clo.append(m["date"])
+        if red or clo:
+            fmt = lambda ds: ", ".join(sorted({d.strftime("%d/%m") for d in ds}))
+            parts = ([f"absent {fmt(red)}"] if red else []) + ([f"official closure {fmt(clo)}"] if clo else [])
+            st["notices"].append(("MAKEUP_REVIEW", "No replacement row found in the sheets for: " + "; ".join(parts) + ". Admin to review whether a make-up class is owed or already arranged."))
+            st["makeup"] = dict(red=sorted(red), closure=sorted(clo)); absent_no += len(red); closure_no += len(clo)
+    plan["makeup_counts"] = dict(absent=absent_no, closure=closure_no)
     for en in enrollments:
         for code, text in en["notices"]: en["student"]["notices"].append((code, f"{en['tab']} row {en['row']}: {text}"))
     return plan
@@ -242,6 +305,11 @@ def emit_sql(plan, meta=True, oct_status="locked", november=False):
       "cross join lateral (select count(*)::int n,(array_agg(sb.id))[1] id,(array_agg(p.code))[1] prog,(array_agg(sb.attendance_status))[1] att from public.student_bookings sb join public.class_sessions sc on sc.id=sb.class_session_id join public.programmes p on p.id=sc.programme_id where sb.student_id=i.student_id and sb.booking_type='regular' and sc.branch_id=bm.id and sc.class_date=i.original_date) ob;")
     A("update public.legacy_replacement_reviews r set over_capacity=true from public.class_sessions c where r.target_class_id=c.id and r.source_batch='mtdc-2026-10'\n"
       " and (select count(*) from public.student_bookings b where b.class_session_id=c.id and b.booking_type='replacement' and b.attendance_status not in ('cancelled','not_scheduled')) + public.legacy_reserved_yellow_seats(c.id) > c.replacement_capacity;")
+    # Reconciliation decisions go through the audited admin RPC (decided_by = the admin used above); nothing here creates an entitlement.
+    for c in chunks(plan["reviews"], 60):
+        vals = ",\n".join("(%s,%s,%s,%s,%s)" % (qu(r["id"]), q(r["decision"][0]), "true" if r["decision"][1] else "false", "true" if r["decision"][2] else "false", q(r["decision"][3])) for r in c)
+        A("select count(public.record_legacy_reconciliation_decision(v.id, null, v.disp, v.idc, v.odc, "
+          + (q(EVIDENCE_REF) if True else "''") + ", v.note)) as decisions_recorded\nfrom (values\n" + vals + "\n) v(id,disp,idc,odc,note);")
     if november: A("select public.generate_monthly_schedule_atomic((select id from branch_map where code='MTDC'), date '2026-11-01') as november_batch;")
     A("do $san$ declare n int; begin\n"
       "  select count(*) into n from public.student_bookings b join public.enrollments e on e.id=b.enrollment_id where e.student_id<>b.student_id; if n>0 then raise exception 'Sanity: % bookings point at another student''s enrollment', n; end if;\n"
@@ -293,6 +361,10 @@ def report(plan, templates=None, old=None):
     gs = {g["student"]["id"] for g in plan["guardians"]}
     P(f"  parents {len(plan['parents'])} | guardian links {len(plan['guardians'])} | students WITHOUT guardian {sum(1 for s in st if s['id'] not in gs)}")
     P(f"  historical yellow-seat source rows (MTDC Oct): {len(plan['reviews'])} | matched to a student {sum(1 for r in plan['reviews'] if r['student'])}")
+    dec = collections.Counter(r["decision"][0] for r in plan["reviews"]); why = collections.Counter(r["decision"][4] for r in plan["reviews"])
+    P(f"\n== colour rule (red = absent, black = official closure) ==\n  cells: {dict(plan['marks'])} | closure days detected: {', '.join(plan['closed_days'])}")
+    P(f"  yellow-seat rows -> decisions: {dict(dec)}\n  reasons: {dict(why)}")
+    P(f"  absent/closure cells with NO replacement row (flagged MAKEUP_REVIEW): absent {plan['makeup_counts']['absent']}, closure {plan['makeup_counts']['closure']} | students flagged: {sum(1 for s in st if s.get('makeup'))}")
     codes = collections.Counter(c for s in st for c, _ in s["notices"])
     P("\n== admin notices that will be written into notes (count per code) ==\n  " + (", ".join(f"{k}={v}" for k, v in sorted(codes.items())) or "none"))
     # planned weekly load per template/week, vs capacity if known
@@ -344,6 +416,7 @@ def main():
     ap.add_argument("--sources", default=str(ROOT / "private/sources"))
     ap.add_argument("--compare-old-db", action="store_true", help="read-only comparison with the current local database")
     ap.add_argument("--sql", help="emit: output file (must be inside private/)")
+    ap.add_argument("--makeup-csv", help="write absent/closure days without a replacement row (contains names) to a file inside private/")
     ap.add_argument("--notices-csv", help="write per-student notices (contains names) to a file inside private/")
     ap.add_argument("--november", default="skip", choices=["skip", "draft"], help="skip (default): the admin drafts November later; draft: generate a November draft now")
     ap.add_argument("--oct-batch-status", default="locked", choices=["draft", "approved", "locked"])
@@ -371,6 +444,14 @@ def main():
             for s in plan["students"]:
                 for c, t in s["notices"]: w.writerow([s["branch"], s["name"], c, t])
         print(f"\nNotices file (contains names): {p}")
+    if a.makeup_csv:
+        p = inside_private(a.makeup_csv)
+        with open(p, "w", newline="") as f:
+            os.chmod(p, 0o600); w = csv.writer(f); w.writerow(["student", "kind", "date"])
+            for s in plan["students"]:
+                for kind, ds in (("absent (red)", s.get("makeup", {}).get("red", [])), ("official closure (black)", s.get("makeup", {}).get("closure", []))):
+                    for d in ds: w.writerow([s["name"], kind, d.isoformat()])
+        print(f"Make-up review list (contains names): {p}")
     if a.cmd == "plan":
         print("\nPlan only. Nothing was written to any database."); return
     sql = emit_sql(plan, meta=True, oct_status=a.oct_batch_status, november=(a.november == "draft"))

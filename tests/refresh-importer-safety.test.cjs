@@ -25,3 +25,12 @@ test("report and notices avoid copying remark text and keep names in private fil
   assert.doesNotMatch(src, /notices\.append\([^)]*r\["remarks"\]/); assert.doesNotMatch(src, /print\([^)]*\["name"\]/)
   assert.match(src, /chmod\(p, 0o600\)/)
 })
+test("colour-based decisions use the audited RPC only and never create entitlements", () => {
+  assert.match(src, /record_legacy_reconciliation_decision\(/)
+  assert.doesNotMatch(src, /insert into public\.legacy_reconciliation_decisions/i)
+  assert.doesNotMatch(src, /insert into public\.makeup_obligations/i)
+  assert.match(src, /Client sheet colour code/)
+  assert.match(src, /never creates an entitlement/)
+  // anything the colours cannot confirm stays a human review item
+  for (const code of ["NO_STUDENT", "OUTSIDE_SHEETS", "DATE_NOT_BEFORE", "ATTENDED_NOT_RED", "BLACK_NOT_CLOSURE", "BLANK_NOT_RED"]) assert.ok(src.includes(`"${code}"`), code)
+})

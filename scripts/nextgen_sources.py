@@ -151,3 +151,48 @@ def parse_replacements(wb, source):
                             original_date=od, original_raw=oraw, tick=clean(ws.cell(r, 5).value), module=up(ws.cell(r, 6).value)))
     for t, n in norm_warn.items(): warnings.append(f"{source}/{t}: {n} slot header(s) had inconsistent AM/PM or length and were normalised")
     return out, warnings
+
+
+# ----------------------------------------------------------------------------- attendance colour marks
+RED_RGB, BLACK_RGB = "FFFF0000", "FF000000"
+
+def _fill_rgb(cell):
+    f = cell.fill
+    if f is None or f.fill_type is None or f.fgColor is None or f.fgColor.type != "rgb": return None
+    return f.fgColor.rgb
+
+def parse_marks(wb, source):
+    """Per student per class date: colour of the weekly attendance cell.
+    red = absent, black = NextGen closed (client-confirmed meaning), white = anything else.
+    Returns list of dict(key, tab, day, date, col, has_text, row). No free text is kept."""
+    import datetime
+    out = []
+    wd = {"SAT": 5, "SUN": 6}
+    for ws in wb.worksheets:
+        title = clean(ws.title)
+        if "REPLACEMENT" in up(title): continue
+        day = up(title)[:3]
+        hr = ci = None
+        for r in range(1, 16):
+            for c in range(1, 9):
+                if up(ws.cell(r, c).value) == "STUDENT NAME": hr, ci = r, c; break
+            if hr: break
+        if not hr: continue
+        weeks = {}
+        for c in range(1, ws.max_column + 1):
+            m = WEEK_RE.match(clean(ws.cell(hr + 1, c).value))
+            if m:
+                d = datetime.date(2026, int(m.group(3)), int(m.group(2)))
+                if day in wd:   # a sheet header can carry the wrong weekday (e.g. Sunday column dated on the Saturday): move to that weekday
+                    d += datetime.timedelta(days=(wd[day] - d.weekday()) % 7)
+                weeks[c] = d
+        end_row = ws.max_row
+        for r in range(hr + 2, ws.max_row + 1):
+            if up(ws.cell(r, ci).value) == "STUDENT NAME" or "FACI" in up(ws.cell(r, ci + 1).value): end_row = r - 1; break
+        for r in range(hr + 2, end_row + 1):
+            if not looks_like_name(ws.cell(r, ci).value): continue
+            for c, d in weeks.items():
+                cell = ws.cell(r, c); rgb = _fill_rgb(cell)
+                out.append(dict(key=name_key(ws.cell(r, ci).value), tab=title, day=day, date=d, source=source, row=r,
+                                col="red" if rgb == RED_RGB else "black" if rgb == BLACK_RGB else "white", has_text=bool(clean(cell.value))))
+    return out
