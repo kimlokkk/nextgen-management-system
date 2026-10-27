@@ -34,3 +34,14 @@ test("audit wrapper is guarded, read-only and local-only", () => {
   assert.doesNotMatch(wrapper, /supabase\.co/i);
   assert.doesNotMatch(wrapper, /\b(pg_restore|dropdb|createdb|supabase db reset)\b/i);
 });
+
+test("source-vs-database comparison is local-only, read-only and keeps names out of default output", () => {
+  const script = fs.readFileSync(path.join(root, "scripts/compare-sources-to-local-db.py"), "utf8");
+  assert.match(script, /local-backup-guard\.py/);
+  assert.match(script, /default_transaction_read_only=on/);
+  assert.match(script, /begin read only/);
+  assert.match(script, /must be inside private\//);
+  const extract = script.match(/EXTRACT = """([\s\S]*?)"""/)[1];
+  assert.doesNotMatch(executableSql(extract), /\b(insert|update|delete|truncate|drop|alter|create|grant|revoke)\b/i);
+  assert.doesNotMatch(script, /supabase\.co/i);
+});
