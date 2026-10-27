@@ -29,7 +29,10 @@ export default async function StudentsPage() {
     const parents = parentsResult.data ?? []
     const rows: DirectoryRow[] = (studentsResult.data ?? []).map((student) => {
         const guardian = student.student_guardians?.find((entry) => entry.is_primary)
-        const guardianName = guardian?.parents?.[0]?.full_name ?? "Not assigned"
+        // PostgREST returns a to-one embed as an object (an array only for to-many), so accept both shapes.
+        const parentEmbed = guardian?.parents as unknown as { full_name: string | null } | { full_name: string | null }[] | null | undefined
+        const guardianParent = Array.isArray(parentEmbed) ? parentEmbed[0] : parentEmbed
+        const guardianName = guardianParent?.full_name ?? "Not assigned"
         return {
             id: student.id,
             title: student.full_name,
