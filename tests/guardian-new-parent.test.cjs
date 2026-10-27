@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const test = require("node:test"), assert = require("node:assert"), fs = require("fs"), path = require("path")
 const root = path.join(__dirname, "..")
 const read = f => fs.readFileSync(path.join(root, f), "utf8")

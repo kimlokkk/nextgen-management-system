@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const test = require("node:test"), assert = require("node:assert"), fs = require("fs"), path = require("path")
 const root = path.join(__dirname, ".."), src = fs.readFileSync(path.join(root, "scripts/refresh-data-from-sources.py"), "utf8")
 const migrations = fs.readdirSync(path.join(root, "supabase/migrations")).filter(f => f.endsWith(".sql")).sort().map(f => fs.readFileSync(path.join(root, "supabase/migrations", f), "utf8")).join("\n")

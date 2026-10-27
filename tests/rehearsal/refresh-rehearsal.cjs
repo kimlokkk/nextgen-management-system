@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Importer rehearsal on an isolated, throwaway Postgres with FAKE data only (run with the real-schema harness; not part of CI).
 // node real-schema.cjs <repo> rehearse.cjs  (REPO passed via env REPO)
 const { execFileSync } = require("child_process"), fs = require("fs"), assert = require("assert")
