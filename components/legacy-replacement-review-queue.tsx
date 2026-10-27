@@ -126,7 +126,6 @@ export function LegacyReplacementReviewQueue({
     const visible = shown.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
 
     const choose = (value: string) => { setCategory(value); setPage(0) }
-    const flagged = rows.filter((item) => item.over_capacity).length
     const checkedSources = rows.filter(item => reconciliationByReview[item.id]?.disposition === "source_checked").length
     const investigationCount = rows.filter(item => reconciliationByReview[item.id]?.disposition === "needs_investigation").length
     const unreviewedSources = rows.filter(item => !reconciliationByReview[item.id]).length
@@ -155,19 +154,6 @@ export function LegacyReplacementReviewQueue({
                     <span className="rounded-lg bg-muted px-3 py-2 text-xs font-semibold">
                         {rows.length} source rows
                     </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                    {[
-                        { label: "Source link candidates", value: rows.filter((r) => r.technical_status === "SOURCE_LINK_CANDIDATE_ADMIN_REVIEW").length },
-                        { label: "History unavailable", value: rows.filter((r) => r.technical_status === "ORIGINAL_BOOKING_MISSING").length },
-                        { label: "Excel reservations", value: rows.filter((r) => r.review_state !== "excluded").length },
-                        { label: "Overcapacity flagged", value: flagged },
-                    ].map((item) => (
-                        <div key={item.label} className="rounded-lg border bg-muted/30 p-3">
-                            <p className="text-xs text-muted-foreground">{item.label}</p>
-                            <p className="mt-1 text-xl font-semibold tabular-nums">{item.value}</p>
-                        </div>
-                    ))}
                 </div>
                 <div className="rounded-lg border bg-muted/20 p-3 text-sm">
                     <p className="font-semibold">Reconciliation decisions · separate from seat reservations</p>
