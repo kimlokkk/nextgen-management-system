@@ -32,7 +32,7 @@ jobs:
           python3 -m py_compile scripts/restore-recovery-lab.py scripts/compare-recovery-lab.py
           python3 -m unittest discover -s tests -p test_recovery_lab_restore.py
       - name: Unit test calendar and timetable labels
-        run: node --test tests/scheduling-calendar.test.cjs tests/schedule-display.test.cjs tests/yellow-seat-usage.test.cjs tests/legacy-source-comparison.test.cjs tests/september-reconciliation.test.cjs tests/admin-readiness.test.cjs tests/november-preflight.test.cjs tests/draft-regeneration-safety.test.cjs tests/november-draft-audit.test.cjs tests/schedule-transition-policy.test.cjs
+        run: node --test tests/local-audit-readonly.test.cjs tests/scheduling-calendar.test.cjs tests/schedule-display.test.cjs tests/yellow-seat-usage.test.cjs tests/legacy-source-comparison.test.cjs tests/september-reconciliation.test.cjs tests/admin-readiness.test.cjs tests/november-preflight.test.cjs tests/draft-regeneration-safety.test.cjs tests/november-draft-audit.test.cjs tests/schedule-transition-policy.test.cjs tests/reschedule-atomicity.test.cjs tests/profile-role-protection.test.cjs
       - name: Build
         run: npm run build
 
@@ -153,6 +153,72 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_schedule_fixture.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/024_atomic_monthly_schedule_generation.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_schedule_integration.sql
+
+  atomic-reschedule-integration:
+    name: Atomic reschedule lifecycle (synthetic only)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify atomic reschedule initiation/assign/reopen/cancel, rollback, capacity, authorization and grants
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/sql/replacement_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/011_replacement_initiation.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/012_replacement_assignment.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/013_replacement_lifecycle.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/014_attendance_management.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/015_cancelled_reschedule_to_replacement.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/025_atomic_reschedule_initiation.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_reschedule_initiation.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/027_atomic_reschedule_lifecycle.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/atomic_reschedule_lifecycle.sql
+
+  profile-role-protection:
+    name: Profile role escalation protection (synthetic only)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prove self-escalation is possible before 026 and blocked after
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/profile_role_protection.sql
 
   backup-restore-drill:
     name: Backup/restore safety drill (synthetic only)
