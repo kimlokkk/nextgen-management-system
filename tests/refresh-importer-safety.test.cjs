@@ -30,7 +30,7 @@ test("colour-based decisions use the audited RPC only and never create entitleme
   assert.doesNotMatch(src, /insert into public\.legacy_reconciliation_decisions/i)
   assert.doesNotMatch(src, /insert into public\.makeup_obligations/i)
   assert.match(src, /Client sheet colour code/)
-  assert.match(src, /never creates an entitlement/)
+  assert.match(src, /never creates an entitlement/i)
   // anything the colours cannot confirm stays a human review item
   for (const code of ["NO_STUDENT", "OUTSIDE_SHEETS", "DATE_NOT_BEFORE", "ATTENDED_NOT_RED", "BLACK_NOT_CLOSURE", "BLANK_NOT_RED"]) assert.ok(src.includes(`"${code}"`), code)
 })
