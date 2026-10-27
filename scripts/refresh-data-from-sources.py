@@ -89,9 +89,14 @@ def build_plan(src):
             ages = [digits(r["age"]) for r in rs if digits(r["age"])]
             if ages: st["extra"].append(f"Age in Oct 2026 sheet: {ages[0]}")
             if len(ds) > 1:
-                st["notices"].append(("NAME_DUPLICATE_IN_DIRECTORY", "Two directory rows share this name; only the first is linked to the roster"))
-                for d in ds[1:]:
-                    dup = new_student(b, d["name"], [("NAME_DUPLICATE_IN_DIRECTORY", "Duplicate-name directory row; admin to confirm whether this is a different child")])
+                pk = lambda d: (S.name_key(d["parent"]), S.phone_key(clean_phone(d["phone"])) if clean_phone(d["phone"]) else None)
+                extra = [d for d in ds[1:] if pk(d) != pk(ds[0])]
+                if len(ds) - 1 > len(extra):
+                    st["notices"].append(("DUPLICATE_DIRECTORY_ROW_MERGED", "Directory listed this child more than once with the same parent and phone; kept one record"))
+                if extra:
+                    st["notices"].append(("NAME_DUPLICATE_IN_DIRECTORY", "Another directory row has the same name but a different parent or phone; only the first is linked to the roster"))
+                for d in extra:
+                    dup = new_student(b, d["name"], [("NAME_DUPLICATE_IN_DIRECTORY", "Duplicate-name directory row with a different parent or phone; admin to confirm whether this is a different child")])
                     attach_parent(parents, guardians, dup, d, rs, plan)
             if ds: attach_parent(parents, guardians, st, ds[0], rs, plan)
             else:

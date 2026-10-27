@@ -20,6 +20,7 @@ dm.append(d("FAKE-M22", "FAKE-PARENT-22")); dm.append(d("FAKE-M23", ""))
 mt.append(row("MTDC", T9, "SAT", "09:00", "SPACE 1", "FAKE-M23", 23)); mt.append(row("MTDC", T9, "SAT", "09:00", "SPACE 1", "FAKE-M24", 24, remarks="2X")); dm.append(d("FAKE-M24", "FAKE-PARENT-24"))
 mt.append(row("MTDC", T9, "SAT", "09:00", "SPACE 1", "FAKE-M25", 25)); mt.append(row("MTDC", T11, "SUN", "11:00", "SPACE 2 NEW CLASS", "FAKE-M25", 26)); dm.append(d("FAKE-M25", "FAKE-PARENT-25"))
 mt.append(row("MTDC", T11, "SUN", "11:00", "SPACE 2 NEW CLASS", "FAKE-M26", 27, remarks="CUTI")); dm.append(d("FAKE-M26", "FAKE-PARENT-26", "012"))
+mt.append(row("MTDC", T9, "SAT", "09:00", "SPACE 1", "FAKE-M27", 28)); dm += [d("FAKE-M27", "FAKE-PARENT-27", "0111000027"), d("FAKE-M27", "FAKE-PARENT-27", "0111000027")]
 cy = [row("CYBER", "SAT 11-12.30PM", "SAT", "11:00", "JUNIOR MAKER", f"FAKE-C{i:02d}", i) for i in range(1, 6)]
 dc = [d(f"FAKE-C{i:02d}", f"FAKE-CPARENT-{i:02d}", "0122000%03d" % i, i) for i in range(1, 6)]
 rep = lambda nm, od, rd, sp=1, st="09:00", n=1: dict(tab="SAT SPACE 1 REPLACEMENT", row=n, name=nm, original_date=od, replacement_date=rd, space=sp, start=st, end="10:30")
