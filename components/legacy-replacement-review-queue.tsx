@@ -96,6 +96,7 @@ export function LegacyReplacementReviewQueue({
     )
     const [search, setSearch] = useState("")
     const [reviewFilter, setReviewFilter] = useState("all")
+    const [showSettled, setShowSettled] = useState(false)
     const [page, setPage] = useState(0)
     const [selectedReferences, setSelectedReferences] = useState<Record<string, string>>({})
     const [justSelected, setJustSelected] = useState<string | null>(null)
@@ -104,7 +105,11 @@ export function LegacyReplacementReviewQueue({
         setJustSelected(reviewId)
     }
 
-    const shown = useMemo(() => rows.filter((item) =>
+    // Rows an admin already settled (source checked) are hidden by default so the queue only shows what still needs action.
+    const settledCount = rows.filter((item) => reconciliationByReview[item.id]?.disposition === "source_checked").length
+    const pool = useMemo(() => showSettled ? rows
+        : rows.filter((item) => reconciliationByReview[item.id]?.disposition !== "source_checked"), [rows, showSettled, reconciliationByReview])
+    const shown = useMemo(() => pool.filter((item) =>
         (category === "all" || (category === "september"
             ? item.original_date?.startsWith("2026-09-")
             : item.technical_status === category))
@@ -113,7 +118,7 @@ export function LegacyReplacementReviewQueue({
             item.student_name, item.source_ref, item.programme_code,
             item.replacement_date, item.original_date ?? "",
         ].some((value) => value.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))
-    ), [rows, category, search, reviewFilter])
+    ), [pool, category, search, reviewFilter])
 
     const pageSize = 10
     const maxPage = Math.max(0, Math.ceil(shown.length / pageSize) - 1)
@@ -192,7 +197,7 @@ export function LegacyReplacementReviewQueue({
                             className={category === item.value
                                 ? "min-h-10 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                                 : "min-h-10 rounded-lg border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"}>
-                            {item.label} · {rows.filter((r) => r.technical_status === item.value).length}
+                            {item.label} · {pool.filter((r) => r.technical_status === item.value).length}
                         </button>
                     ))}
                     <button type="button" onClick={() => choose("september")}
@@ -200,13 +205,13 @@ export function LegacyReplacementReviewQueue({
                         className={category === "september"
                             ? "min-h-10 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                             : "min-h-10 rounded-lg border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"}>
-                        September originals · {septemberOctoberRows.length}
+                        September originals · {pool.filter((r) => r.original_date?.startsWith("2026-09-")).length}
                     </button>
                     <button type="button" onClick={() => choose("all")} aria-pressed={category === "all"}
                         className={category === "all"
                             ? "min-h-10 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
                             : "min-h-10 rounded-lg border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"}>
-                        All · {rows.length}
+                        All · {pool.length}
                     </button>
                 </nav>
                 <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)]">
@@ -229,6 +234,11 @@ export function LegacyReplacementReviewQueue({
                         </select>
                     </label>
                 </div>
+                <label className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={showSettled} onChange={(e) => { setShowSettled(e.target.checked); setPage(0) }}
+                        className="size-4 accent-primary" />
+                    Also show records already settled (source checked) · {settledCount}
+                </label>
                 <p aria-live="polite" className="text-xs text-muted-foreground">
                     {shown.length} matching records · Showing {shown.length ? currentPage * pageSize + 1 : 0}–{Math.min(shown.length, (currentPage + 1) * pageSize)}
                 </p>
