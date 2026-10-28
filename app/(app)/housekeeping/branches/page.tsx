@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import { createClient } from "@/lib/supabase/server"
 import { createBranch, toggleBranch } from "./actions"
 
@@ -58,6 +59,7 @@ export default async function BranchesPage() {
             </div>
 
             <div className="overflow-hidden rounded-xl border bg-background">
+                <TableScrollArea label="Branches">
                 <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                         <tr className="border-b">
@@ -112,6 +114,7 @@ export default async function BranchesPage() {
                         ))}
                     </tbody>
                 </table>
+                </TableScrollArea>
             </div>
         </div>
     )

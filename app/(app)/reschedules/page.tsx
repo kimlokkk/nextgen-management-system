@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
+import { QueueOverview, type QueueEntry } from "@/components/queue-overview"
 
 export default async function ReschedulesPage() {
     const supabase = await createClient()
@@ -15,13 +16,14 @@ export default async function ReschedulesPage() {
       student_id,
       enrollment_id,
       source_booking_id,
+      target_booking_id,
       obligation_type,
       status,
       reason,
       created_at
     `)
         .eq("obligation_type", "reschedule")
-        .in("status", ["open", "scheduled"])
+        .in("status", ["open", "scheduled", "completed", "cancelled"])
         .order("created_at", {
             ascending: true,
         })
@@ -183,166 +185,55 @@ export default async function ReschedulesPage() {
     // PAGE
     // =====================================================
 
-    return (
-        <div className="space-y-8">
-            <div>
-                <p className="text-sm text-muted-foreground">
-                    Scheduling
-                </p>
+    const targetBookingIds = rows
+        .map((item) => item.target_booking_id)
+        .filter((id): id is string => !!id)
 
-                <h1 className="mt-1 text-3xl font-bold">
-                    Reschedule Queue
-                </h1>
+    const { data: targetBookings, error: targetError } = targetBookingIds.length
+        ? await supabase.from("student_bookings")
+            .select("id, class_session_id")
+            .in("id", targetBookingIds)
+        : { data: [], error: null }
 
-                <p className="mt-2 text-muted-foreground">
-                    Students waiting for a new class slot.
-                </p>
-            </div>
+    if (targetError) {
+        return <p className="text-destructive">Could not load assigned classes.</p>
+    }
 
-            <div className="overflow-hidden rounded-xl border bg-background">
-                <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                        <tr className="border-b">
-                            <th className="px-5 py-3 text-left">
-                                Student
-                            </th>
+    const targetSessionIds = [...new Set((targetBookings ?? []).map((item) => item.class_session_id))]
+    const { data: targetSessions, error: sessionError } = targetSessionIds.length
+        ? await supabase.from("class_sessions")
+            .select("id, class_date, start_time, end_time")
+            .in("id", targetSessionIds)
+        : { data: [], error: null }
 
-                            <th className="px-5 py-3 text-left">
-                                Original Class
-                            </th>
+    if (sessionError) {
+        return <p className="text-destructive">Could not load reschedule assignments.</p>
+    }
 
-                            <th className="px-5 py-3 text-left">
-                                Programme
-                            </th>
+    const targetMap = new Map((targetBookings ?? []).map((item) => [item.id, item.class_session_id]))
+    const targetSessionMap = new Map((targetSessions ?? []).map((item) => [item.id, item]))
 
-                            <th className="px-5 py-3 text-left">
-                                Branch
-                            </th>
+    const entries: QueueEntry[] = rows.map((obligation) => {
+        const source = sourceBookingMap.get(obligation.source_booking_id)
+        const original = source ? classSessionMap.get(source.class_session_id) : null
+        const targetSessionId = obligation.target_booking_id
+            ? targetMap.get(obligation.target_booking_id) : null
+        const target = targetSessionId ? targetSessionMap.get(targetSessionId) : null
 
-                            <th className="px-5 py-3 text-left">
-                                Status
-                            </th>
+        return {
+            id: obligation.id,
+            student: studentMap.get(obligation.student_id)?.full_name ?? "Student",
+            programme: original ? (programmeMap.get(original.programme_id) ?? "Programme unavailable") : "Programme unavailable",
+            branch: original ? (branchMap.get(original.branch_id) ?? "Branch unavailable") : "Branch unavailable",
+            originalDate: original?.class_date ?? "",
+            originalTime: original ? `${original.start_time.slice(0, 5)}–${original.end_time.slice(0, 5)}` : "",
+            destination: target
+                ? `${target.class_date} · ${target.start_time.slice(0, 5)}–${target.end_time.slice(0, 5)}`
+                : obligation.status === "scheduled" || obligation.status === "completed"
+                    ? "Assignment unavailable" : undefined,
+            status: obligation.status,
+        }
+    })
 
-                            <th className="px-5 py-3 text-right">
-                                Action
-                            </th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {rows.length > 0 ? (
-                            rows.map((obligation) => {
-                                const student =
-                                    studentMap.get(
-                                        obligation.student_id
-                                    )
-
-                                const sourceBooking =
-                                    sourceBookingMap.get(
-                                        obligation.source_booking_id
-                                    )
-
-                                const classSession =
-                                    sourceBooking
-                                        ? classSessionMap.get(
-                                            sourceBooking.class_session_id
-                                        )
-                                        : null
-
-                                return (
-                                    <tr
-                                        key={obligation.id}
-                                        className="border-b last:border-0"
-                                    >
-                                        <td className="px-5 py-4 font-medium">
-                                            {student?.full_name ?? "-"}
-                                        </td>
-
-                                        <td className="px-5 py-4">
-                                            {classSession ? (
-                                                <>
-                                                    <div className="font-medium">
-                                                        {classSession.class_date}
-                                                    </div>
-
-                                                    <div className="text-xs text-muted-foreground">
-                                                        W
-                                                        {
-                                                            classSession.week_number
-                                                        }
-                                                        {" · "}
-                                                        {classSession.start_time.slice(
-                                                            0,
-                                                            5
-                                                        )}
-                                                        {" - "}
-                                                        {classSession.end_time.slice(
-                                                            0,
-                                                            5
-                                                        )}
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                "-"
-                                            )}
-                                        </td>
-
-                                        <td className="px-5 py-4">
-                                            {classSession
-                                                ? programmeMap.get(
-                                                    classSession.programme_id
-                                                ) ?? "-"
-                                                : "-"}
-                                        </td>
-
-                                        <td className="px-5 py-4">
-                                            {classSession
-                                                ? branchMap.get(
-                                                    classSession.branch_id
-                                                ) ?? "-"
-                                                : "-"}
-                                        </td>
-
-                                        <td className="px-5 py-4">
-                                            <span className="rounded-full border px-3 py-1 text-xs font-medium uppercase">
-                                                {obligation.status}
-                                            </span>
-                                        </td>
-
-                                        <td className="px-5 py-4 text-right">
-                                            {obligation.status ===
-                                                "open" ? (
-                                                <Link
-                                                    href={`/reschedules/${obligation.id}`}
-                                                    className="font-medium underline underline-offset-4"
-                                                >
-                                                    Find New Slot
-                                                </Link>
-                                            ) : (
-                                                <Link
-                                                    href={`/reschedules/${obligation.id}`}
-                                                    className="font-medium underline underline-offset-4"
-                                                >
-                                                    View
-                                                </Link>
-                                            )}
-                                        </td>
-                                    </tr>
-                                )
-                            })
-                        ) : (
-                            <tr>
-                                <td
-                                    colSpan={6}
-                                    className="px-5 py-10 text-center text-muted-foreground"
-                                >
-                                    No open reschedules.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    )
+    return <QueueOverview kind="reschedule" entries={entries} />
 }

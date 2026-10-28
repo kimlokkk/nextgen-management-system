@@ -25,17 +25,18 @@ export default async function AppLayout({
         .single()
 
     return (
-        <div className="min-h-screen bg-muted/30">
+        <div className="nextgen-app min-h-screen min-w-0 bg-background">
+            <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-2 focus:z-[80] focus:rounded-lg focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg">Skip to content</a>
             <AppSidebar />
 
-            <div className="md:pl-64">
+            <div className="min-w-0 md:pl-64">
                 <AppHeader
                     email={user.email ?? ""}
                     name={profile?.full_name}
                     role={profile?.role ?? ""}
                 />
 
-                <main className="p-6 md:p-8">
+                <main id="main-content" className="mx-auto w-full max-w-[1600px] min-w-0 px-4 py-6 sm:px-6 sm:py-7 xl:px-9 xl:py-8">
                     {children}
                 </main>
             </div>

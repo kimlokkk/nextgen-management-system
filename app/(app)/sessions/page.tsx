@@ -1,3 +1,4 @@
+import { TableScrollArea } from "@/components/table-scroll-area"
 import { createClient } from "@/lib/supabase/server"
 
 export default async function SessionsPage() {
@@ -65,6 +66,7 @@ export default async function SessionsPage() {
         </p>
 
         <div className="mt-8 overflow-hidden rounded-xl border">
+          <TableScrollArea label="Session directory">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/50">
               <tr>
@@ -133,6 +135,7 @@ export default async function SessionsPage() {
               ))}
             </tbody>
           </table>
+          </TableScrollArea>
         </div>
       </div>
     </main>
