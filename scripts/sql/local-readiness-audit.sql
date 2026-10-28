@@ -60,9 +60,9 @@ cal_nov as (
 rows_ as (
 -- =================== A. Database, security, migration state ===================
 select 'A'::text sec, 'A01'::text id, 'public tables present'::text title,
-       case when (select count(*) from pg_tables where schemaname = 'public') = 24 then 'PASS' else 'WARN' end status,
-       (select count(*) from pg_tables where schemaname = 'public')::text actual, '24'::text expected,
-       'Migrations 001-031 define 24 public tables.'::text note
+       case when (select count(*) from pg_tables where schemaname = 'public') = 25 then 'PASS' else 'WARN' end status,
+       (select count(*) from pg_tables where schemaname = 'public')::text actual, '25'::text expected,
+       'Migrations 001-032 define 25 public tables.'::text note
 union all
 select 'A', 'A02', 'tables WITHOUT row level security',
        case when (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace

@@ -26,7 +26,7 @@ STOP = re.compile(r"\b(GRAD\w*|STOP|BERHENTI|TAMAT)\b")
 TWOX = re.compile(r"\b2\s*X\b")
 WKS = re.compile(r"(?:\bW(?:EEK)?\s*|\bMINGGU\s*(?:KE\s*)?)([1-4])\b")
 REVIEW_TOKENS = re.compile(r"\b(CUTI|TUKAR|START|JOIN|BALIK|PINDAH|SABTU|AHAD|JAN|2027|SEKOLAH)\b")
-WIPE = ["enrollment_changes", "class_seat_allocation_changes", "draft_schedule_edits", "legacy_reconciliation_decision_audit", "legacy_reconciliation_decisions", "legacy_replacement_review_audit",
+WIPE = ["schedule_draft_regenerations", "enrollment_changes", "class_seat_allocation_changes", "draft_schedule_edits", "legacy_reconciliation_decision_audit", "legacy_reconciliation_decisions", "legacy_replacement_review_audit",
         "legacy_replacement_reviews", "class_replacement_capacity_audit", "class_replacement_capacity_reviews",
         "makeup_obligations", "student_bookings", "class_sessions", "schedule_batches", "student_guardian_link_audit",
         "student_guardians", "enrollments", "students", "parents", "legacy_september_evidence"]

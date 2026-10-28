@@ -16,10 +16,10 @@ import {
     type ScheduleBatchSummary,
     type ScheduleClassSummary,
 } from "@/components/schedule-workspace"
-import { approveSchedule, generateSchedule, lockSchedule, reopenSchedule } from "./actions"
+import { approveSchedule, generateSchedule, lockSchedule, regenerateDraft, reopenSchedule } from "./actions"
 
 type PageProps = {
-    searchParams: Promise<{ batch?: string; prepare_month?: string; branch?: string }>
+    searchParams: Promise<{ batch?: string; prepare_month?: string; branch?: string; rebuilt?: string }>
 }
 
 function formatMonth(value: string) {
@@ -183,8 +183,8 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                 <h2 className="font-semibold">Generate monthly schedule</h2>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                     Select a branch and month to create a new draft.
-                    Generate brand-new drafts only. Existing draft, approved and locked schedules cannot be regenerated;
-                    their class IDs and bookings are protected.
+                    Generating is for a month that has no schedule yet. A draft that is wrong can be rebuilt from its own page while nothing real depends on it;
+                    approved and locked schedules are protected.
                     Plan branch closures in the <Link href="/housekeeping/calendar" className="font-semibold text-primary underline underline-offset-2">Academic Calendar</Link> first;
                     an undecided closure blocks affected class generation.
                 </p>
@@ -231,6 +231,13 @@ export default async function SchedulePage({ searchParams }: PageProps) {
             .limit(50)
         : { data: [] }
     const manualEdits = editRows ?? []
+    // What a rebuild would do (migration 032, read-only). Missing function => no rebuild panel.
+    const rebuildPreview = selectedBatch?.status === "draft"
+        ? ((await supabase.rpc("preview_draft_regeneration", { p_batch_id: selectedBatch.id })).data as {
+            found?: boolean; classes?: number; bookings?: number; manual_edits?: number; seat_changes?: number
+            capacity_decisions?: number; blockers?: string[]; can_regenerate?: boolean
+        } | null)
+        : null
     const editStudentIds = [...new Set(manualEdits.map((row) => row.student_id).filter(Boolean))] as string[]
     const { data: editStudents } = editStudentIds.length > 0
         ? await supabase.from("students").select("id, full_name").in("id", editStudentIds)
@@ -259,6 +266,12 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                     </p>
                 </div>
             </header>
+
+            {params.rebuilt === "1" && selectedBatch?.status === "draft" && (
+                <p role="status" className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-300">
+                    The draft was rebuilt from today&apos;s enrollments. Review it again before approving.
+                </p>
+            )}
 
             <ScheduleActions
                 key={`${selectedBatch?.id ?? "no-schedule"}:${prepareMonth ?? "current"}`}
@@ -342,6 +355,46 @@ export default async function SchedulePage({ searchParams }: PageProps) {
                                                 Approve draft
                                             </button>
                                         </form>
+                                    )}
+                                    {selectedBatch.status === "draft" && rebuildPreview?.found && (
+                                        <details className="rounded-lg border bg-muted/20 p-3 text-xs">
+                                            <summary className="cursor-pointer select-none font-semibold">Wrong enrollments? Rebuild this draft</summary>
+                                            <div className="mt-3 space-y-2 leading-5">
+                                                <p>
+                                                    This throws away the draft ({rebuildPreview.classes ?? 0} classes, {rebuildPreview.bookings ?? 0} bookings)
+                                                    and builds it again from today&apos;s enrollments. If the new draft cannot be built, this one stays as it is.
+                                                </p>
+                                                {(rebuildPreview.blockers ?? []).length > 0 ? (
+                                                    <>
+                                                        <p className="font-medium text-destructive">It cannot be rebuilt right now:</p>
+                                                        <ul className="space-y-1 text-destructive">
+                                                            {(rebuildPreview.blockers ?? []).map((blocker) => <li key={blocker}>• {blocker}</li>)}
+                                                        </ul>
+                                                    </>
+                                                ) : (
+                                                    <form action={regenerateDraft} className="space-y-2">
+                                                        <input type="hidden" name="batch_id" value={selectedBatch.id} />
+                                                        {((rebuildPreview.manual_edits ?? 0) + (rebuildPreview.seat_changes ?? 0) + (rebuildPreview.capacity_decisions ?? 0)) > 0 && (
+                                                            <label className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 leading-5">
+                                                                <input name="acknowledge_losses" type="checkbox" value="yes" required
+                                                                    className="mt-0.5 size-4 accent-primary" />
+                                                                I accept losing {rebuildPreview.manual_edits ?? 0} manual change(s), {rebuildPreview.seat_changes ?? 0} seat change(s)
+                                                                and {rebuildPreview.capacity_decisions ?? 0} capacity decision(s) in this draft. They stay in the audit history.
+                                                            </label>
+                                                        )}
+                                                        <input name="reason" required minLength={10} maxLength={500}
+                                                            placeholder="Why? (at least 10 characters)"
+                                                            className="h-9 w-full rounded-lg border bg-background px-2 text-xs" />
+                                                        <label className="flex items-start gap-2 leading-5">
+                                                            <input name="confirm_rebuild" type="checkbox" value="yes" required
+                                                                className="mt-0.5 size-4 accent-primary" />
+                                                            Rebuild this month&apos;s draft now.
+                                                        </label>
+                                                        <button type="submit" className="ui-primary-action w-full">Rebuild draft</button>
+                                                    </form>
+                                                )}
+                                            </div>
+                                        </details>
                                     )}
                                     {selectedBatch.status === "approved" && (
                                         <>

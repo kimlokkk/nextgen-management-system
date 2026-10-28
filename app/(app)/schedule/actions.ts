@@ -289,3 +289,32 @@ export async function reopenSchedule(formData: FormData) {
     if (error) throw new Error(error.message)
     redirect(`/schedule?batch=${parsed.data.batchId}`)
 }
+
+/**
+ * Discard a DRAFT month and generate it again from today's enrollments in one transaction.
+ * The RPC (migration 032) refuses anything that real data depends on, needs an explicit yes when
+ * manual changes would be lost, writes an audit row, and keeps the old draft if the new one fails.
+ */
+export async function regenerateDraft(formData: FormData) {
+    if (formData.get("confirm_rebuild") !== "yes") throw new Error("Confirm that you want to rebuild this draft")
+    const parsed = z.object({
+        batchId: z.string().uuid(),
+        reason: z.string().trim().min(10, "Explain why in at least 10 characters").max(500),
+    }).safeParse({ batchId: formData.get("batch_id"), reason: formData.get("reason") })
+    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid request")
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) redirect("/auth/login")
+    const { data, error } = await supabase.rpc("regenerate_draft_schedule", {
+        p_batch_id: parsed.data.batchId,
+        p_reason: parsed.data.reason,
+        p_acknowledge_losses: formData.get("acknowledge_losses") === "yes",
+    })
+    if (error) throw new Error(error.message)
+    const newBatchId = (data as { new_batch_id?: string } | null)?.new_batch_id
+    if (!newBatchId || !z.string().uuid().safeParse(newBatchId).success) {
+        throw new Error("The draft was rebuilt but no schedule id came back. Open the schedule list to find it")
+    }
+    redirect(`/schedule?batch=${newBatchId}&rebuilt=1`)
+}
