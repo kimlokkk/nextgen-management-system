@@ -1,5 +1,5 @@
 # NextGen — Admin pilot to company production handoff
-Updated: 2026-10-27 | Owner decision: prepare, do not deploy yet
+Updated: 2026-10-28 (facts section refreshed from the 2026-10-28 local audit) | Owner decision: prepare, do not deploy yet
 Branch: feat/replacement-engine-phase1-20261016 | Existing PR #1: draft
 
 ## Executive release decision
@@ -11,7 +11,10 @@ Branch: feat/replacement-engine-phase1-20261016 | Existing PR #1: draft
 ## Verified versus unverified facts (do not overstate)
 - Last observed GitHub working branch head before this document: df9cac2 (2026-10-25); PR #1 open/draft; latest automated GitHub Actions passed. Branch must be checked again by implementer.
 - Scheduling generation now uses atomic database RPC in migration 024. All current production-readiness decisions must use current code, not superseded non-atomic generator notes elsewhere.
-- Last documented Supabase LOCAL baselines: 622 September evidence entries (492 weekly regular roster and 130 historical replacement rows); October MTDC 48 regular sessions / 352 regular bookings and 81 historical replacement reservations; November MTDC draft 48 classes / 356 bookings. These are snapshot checkpoints, not fresh live counts or proof of attendance or identity.
+- Current LOCAL baseline (read-only aggregate audit 2026-10-28, `docs/release-evidence/nextgen-local-readiness-2026-10-28.md`; migrations 001-029 applied; 34 PASS / 4 WARN / 3 UNKNOWN / 0 FAIL): 144 students, 101 parents, 139 active enrollments (MTDC 89, Cyberjaya 50) covering 131 distinct students; 622 September evidence rows (492 regular roster + 130 historical replacement); October MTDC 48 regular sessions / 332 regular bookings (locked) and 81 historical replacement reservations. These are snapshots, not proof of attendance or identity.
+- SUPERSEDED: the earlier "November MTDC draft 48 classes / 356 bookings" checkpoint no longer exists locally. The data refresh (importer) rebuilt local data from the sheets and the November draft is now optional: there are 0 November batches. The admin generates it from Class schedule when ready. Ignore the old 48/356 and 352-booking figures elsewhere.
+- Open WARN items (2026-10-28): 39 active students with no guardian link; 3 parents with no phone/WhatsApp; 13 active students with no active enrollment; 5 October classes at 6/5 yellow usage. Also 8 students have more than one active enrollment (could be legitimate, e.g. two programmes, but no database rule prevents accidental duplicates).
+- Historical replacement review: 81 source rows classified; 52 recorded as source_checked, 29 still needs_investigation. No make-up obligations were created from legacy rows (0).
 - Five October sessions have 6/5 yellow-seat reservations; real operational room/facilitator confirmation remains required.
 - A guardian relationship for Hadi Ayyash was still pending independent source verification.
 - No proof that the company GitHub repository, company Supabase project, Vercel deployment, production secrets or local-to-company data cutover is complete.
@@ -23,7 +26,7 @@ Branch: feat/replacement-engine-phase1-20261016 | Existing PR #1: draft
 1. Import verified real parents, students, guardians, enrollments and branch/programme/session settings before admin onboarding. Preserve stable IDs, relationships, original dates and audit history. Deduplicate only with independent evidence, never by fuzzy names alone.
 2. Keep September and October as read-only/appropriately reviewable historical data; do NOT erase them or automatically turn ambiguous roster rows into attendance or replacement entitlement.
 3. Keep confirmed October historical yellow reservations in capacity accounting. Pending historical sources stay pending with an owner and evidence trail. Five 6/5 sessions must not be silently overridden.
-4. Preserve November MTDC saved DRAFT (48/356 checkpoint) and audit exact student/enrollment/date/slot pairings against present rules. Do NOT click Generate on the same branch/month, do not overwrite or lock without admin approval.
+4. When a November MTDC DRAFT exists, preserve it and audit exact student/enrollment/date/slot pairings against present rules. (Superseded 2026-10-28: no November draft exists now. When the admin generates one, it must not be overwritten, and not locked without admin approval.)
 5. Explicitly check Cyberjaya data quality and completeness independently of MTDC before any claim of company-wide readiness.
 6. Exclude demo/synthetic users and fixtures from production. Do not publish private CSVs, student names, phone numbers, Auth data, backups, or secrets in commits, PRs or ChatGPT.
 7. Use a signed source-of-truth and document the cutoff/freeze time: no manual changes in LOCAL after final export, no parallel write authorities, reconcile deltas if source changes.

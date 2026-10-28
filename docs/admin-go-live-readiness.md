@@ -7,7 +7,7 @@ The `/readiness` route is read-only and restricted to active admin/super_admin a
 - Five October yellow-seat exceptions have been observed in MTDC staging. Their real capacity decisions require operational verification; do not auto-approve or invent attendance.
 - November needs a deliberate draft review/approval, with calendar and student enrollment verification.
 - Production backup/restore, admin user permissions, signed-off import and end-to-end UAT remain manual requirements.
-- Draft regeneration uses delete/recreate and must not be run on preserved October legacy sessions or a production database until hardened.
+- Draft regeneration is disabled (generation is atomic and refuses any existing batch). There is currently no admin 'discard draft and regenerate' action; a wrong draft can only be corrected with the draft edit tools (move/add/remove, or send back to draft).
 
 ## Release gates (human acceptance)
 1. Compare actual directory and enrollment totals with signed-off MTDC/Cyberjaya sources; resolve invalid links without deleting history.
@@ -73,5 +73,12 @@ No migrations or data writes are added by this audit screen.
 - Database RLS still applies. Existing draft/approved/locked batches **cannot** be regenerated, and previous months are never deleted. Postgres uniqueness is the final concurrency safeguard.
 - Any error, including an injected failure after the *second booking*, rolls back **all** writes. CI job `Atomic schedule rollback and security` verifies successful generation, moved/skipped calendar weeks, duplicates, overcapacity, non-admin/inactive-admin denial, and forced rollback on **synthetic** data in isolated PostgreSQL.
 - Earlier sections referring to delete-and-recreate or non-transactional new-draft cleanup describe the **old** generator, not current branch behavior.
-- No extra data migration or import is performed by 024. Apply it in **Supabase Local** only first. The existing MTDC November draft (48 classes, 356 bookings) remains untouched. Do not press Generate for November again.
+- No extra data migration or import is performed by 024. Apply it in **Supabase Local** only first. (Superseded 2026-10-28: the local November draft no longer exists after the data refresh; the admin generates it when ready. Once a draft exists, do not generate again for the same branch/month.)
 - Release gate remains **human admin UAT, historical capacity decisions, guardian confirmation, production data cutover and verified backup/restore**. Passing CI does not authorize deployment.
+
+## Migrations 025-029 (added after this document was first written; local only)
+- 025 and 027: reschedule initiate/assign/reopen/cancel are single atomic SECURITY DEFINER RPCs with class-row locking. 026: signed-in users can no longer change their own role or active flag.
+- 028: `resolve_missing_student_guardian_new_parent` creates a parent and links the guardian in one transaction (admin only, audited). `/readiness/guardians` has a searchable parent picker.
+- 029: admins can edit a DRAFT month: `move_student_in_draft`, `add_student_to_draft_class`, `remove_student_from_draft_class` (same programme; capacity, overlap and enrollment-window checks; reason required; one row each in `draft_schedule_edits`; enrollments are never changed) and `reopen_schedule_draft` (approved, not locked, back to draft). Hand-placed bookings are flagged `manually_placed`.
+- Data refresh importer (`scripts/refresh-data-from-sources.py`): rebuilds local business data from the sheets. It only targets the local Native Runtime database and `apply --target main` requires a fresh backup snapshot. Its per-student notices and make-up review lists are written to `private/*.csv` (git-ignored) and are NOT yet shown inside the app.
+- The 2026-10-28 audit confirms all 29 migrations are applied and the audit expects 22 public tables.
