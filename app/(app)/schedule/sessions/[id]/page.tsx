@@ -742,7 +742,7 @@ export default async function ScheduleSessionPage({
                                 <label className="block text-sm font-medium">
                                     Regular seats after the change (replacement becomes the rest)
                                     <input name="new_regular" type="number" required min={minRegular} max={maxRegular}
-                                        defaultValue={session.regular_capacity}
+                                        defaultValue={Math.min(Math.max(session.regular_capacity, minRegular), maxRegular)}
                                         className="mt-1 h-10 w-full rounded-lg border bg-background px-3 text-sm sm:w-40" />
                                 </label>
                                 <label className="block text-sm font-medium">
