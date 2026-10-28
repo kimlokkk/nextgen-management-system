@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { createEnrollment } from "@/app/(app)/enrollments/actions"
 import { FormSubmit } from "@/components/form-submit"
+import { WeekPicker } from "@/components/enrollment-row-actions"
 
 type Student = { id: string; full_name: string }
 type Branch = { id: string; name: string }
@@ -29,6 +30,7 @@ export function EnrollmentForm({ students, branches, programmes, sessions }: Enr
     const [branchId, setBranchId] = useState("")
     const [programmeId, setProgrammeId] = useState("")
     const [sessionId, setSessionId] = useState("")
+    const [frequency, setFrequency] = useState("weekly")
 
     const availableProgrammes = useMemo(() => {
         if (!branchId) return []
@@ -93,12 +95,14 @@ export function EnrollmentForm({ students, branches, programmes, sessions }: Enr
             </div>
             <div>
                 <label htmlFor="enrollment-frequency" className="mb-2 block text-sm font-medium">Frequency <span aria-hidden="true" className="text-destructive">*</span></label>
-                <select id="enrollment-frequency" name="frequency_type" required defaultValue="weekly" className={field}>
+                <select id="enrollment-frequency" name="frequency_type" required value={frequency}
+                    onChange={(event) => setFrequency(event.target.value)} className={field}>
                     <option value="weekly">Weekly</option>
                     <option value="twice_monthly">Twice monthly</option>
                     <option value="custom">Custom</option>
                 </select>
             </div>
+            {frequency !== "weekly" && <div className="sm:col-span-2"><WeekPicker defaultWeeks={[]} /></div>}
             <div>
                 <label htmlFor="enrollment-start-date" className="mb-2 block text-sm font-medium">Start date <span aria-hidden="true" className="text-destructive">*</span></label>
                 <input id="enrollment-start-date" type="date" name="start_date" required className={field} />

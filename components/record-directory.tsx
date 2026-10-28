@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react"
 import { ArrowRight, Plus, Search, X } from "lucide-react"
 import { TableScrollArea } from "@/components/table-scroll-area"
 
@@ -25,6 +25,10 @@ type DirectoryProps = {
     emptyDescription: string
     searchPlaceholder?: string
     prerequisites?: ReactNode
+    notice?: ReactNode
+    // A client component and plain data per row: elements are created here, not sent from the server.
+    RowActions?: ComponentType<any> // eslint-disable-line @typescript-eslint/no-explicit-any
+    rowActionProps?: Record<string, object>
 }
 
 function StatusTag({ value }: { value: string }) {
@@ -39,13 +43,14 @@ function StatusTag({ value }: { value: string }) {
 
 export function RecordDirectory({
     title, description, eyebrow = "People", rows, columns, createLabel,
-    createForm, emptyTitle, emptyDescription, searchPlaceholder, prerequisites,
+    createForm, emptyTitle, emptyDescription, searchPlaceholder, prerequisites, notice, RowActions, rowActionProps,
 }: DirectoryProps) {
     const [query, setQuery] = useState("")
     const [filter, setFilter] = useState("all")
     const [formOpen, setFormOpen] = useState(false)
     const formArea = useRef<HTMLDivElement>(null)
 
+    const hasActions = !!RowActions && !!rowActionProps && rows.some((row) => !!rowActionProps[row.id])
     const statuses = useMemo(() => [...new Set(rows.map((r) => r.status).filter((v): v is string => !!v))], [rows])
     const visible = useMemo(() => {
         const normalized = query.trim().toLocaleLowerCase()
@@ -79,6 +84,8 @@ export function RecordDirectory({
                     {formOpen ? "Close form" : createLabel}
                 </button>
             </div>
+
+            {notice}
 
             {formOpen && (
                 <section id="directory-create-form" ref={formArea} aria-label={createLabel}
@@ -164,6 +171,7 @@ export function RecordDirectory({
                                             </div>
                                         ))}
                                     </dl>
+                                    {RowActions && rowActionProps?.[row.id] ? <RowActions {...rowActionProps[row.id]} /> : null}
                                 </article>
                             ))}
                         </div>
@@ -177,6 +185,7 @@ export function RecordDirectory({
                                                 <th key={column} scope="col" className="px-5 py-3 text-left font-medium">{column}</th>
                                             ))}
                                             {statuses.length > 0 && <th scope="col" className="px-5 py-3 text-left font-medium">Status</th>}
+                                            {hasActions && <th scope="col" className="px-5 py-3 text-left font-medium">Actions</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -190,6 +199,7 @@ export function RecordDirectory({
                                                     <td key={field.label} className="px-5 py-4">{field.value || "—"}</td>
                                                 ))}
                                                 {statuses.length > 0 && <td className="px-5 py-4">{row.status && <StatusTag value={row.status} />}</td>}
+                                                {hasActions && <td className="px-5 py-4 align-top">{RowActions && rowActionProps?.[row.id] ? <RowActions {...rowActionProps[row.id]} /> : null}</td>}
                                             </tr>
                                         ))}
                                     </tbody>

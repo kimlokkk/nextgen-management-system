@@ -103,7 +103,7 @@ export NEXTGEN_RECOVERY_LAB_URL="postgresql://postgres:postgres@127.0.0.1:25196/
 python3 scripts/restore-recovery-lab.py .local-backups/snapshot-20261025T074148Z-cZNJ1t
 ```
 
-This is a **dry run by default**. It checks the source and target schema layouts, verifies archive hashes, checks target has no existing business/Auth identities, and selects **only** the archived `TABLE DATA` for 23 public tables plus `auth.users` and `auth.identities`. The original full dump is **never replayed as schema**, so managed Realtime functions will not be re-created. It intentionally excludes live session/refresh tokens, Auth MFA data and Storage/R2 files.
+This is a **dry run by default**. It checks the source and target schema layouts, verifies archive hashes, checks target has no existing business/Auth identities, and selects **only** the archived `TABLE DATA` for 24 public tables plus `auth.users` and `auth.identities`. The original full dump is **never replayed as schema**, so managed Realtime functions will not be re-created. It intentionally excludes live session/refresh tokens, Auth MFA data and Storage/R2 files.
 
 To perform the isolated Recovery Lab data restore **after reviewing dry-run output**, add `--apply`. It executes a *single PostgreSQL transaction* (psql `-1`): precondition checks, replaces only seeded application rows, temporarily uses `SET LOCAL session_replication_role=replica` to prevent duplicate profile triggers, imports selected Auth/application data, switches trigger behavior back, validates aggregate snapshot baselines and checks all relevant foreign-key relationships. Any error aborts the full transaction, including the seed cleanup. It only targets localhost port 25196 and never writes to the source 24080.
 
@@ -113,6 +113,6 @@ After the transactional import passes:
 python3 scripts/compare-recovery-lab.py
 ```
 
-This **read-only** script compares counts and canonical row-content fingerprints for all 23 public tables plus two Auth tables against the **current LIVE source database** without exposing values. Source changes since the snapshot can cause mismatches; they must be investigated or a fresh backup taken, not dismissed.
+This **read-only** script compares counts and canonical row-content fingerprints for all 24 public tables plus two Auth tables against the **current LIVE source database** without exposing values. Source changes since the snapshot can cause mismatches; they must be investigated or a fresh backup taken, not dismissed.
 
 **Still pending**: actual login and role-policy UAT, Auth MFA/session configuration, Storage/R2 object bytes, and recovery with compatible production secrets/configuration. This flow establishes an application-data/UUID recovery drill only, not a certified full disaster-recovery restore.

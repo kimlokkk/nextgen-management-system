@@ -56,5 +56,5 @@ test("the class page offers the panel to admins on any month, in plain wording",
   assert.match(page, /The total stays/)
 })
 test("the data refresh importer classifies the new audit table so it does not refuse to run", () => {
-  assert.match(importer, /WIPE = \["class_seat_allocation_changes"/)
+  assert.match(importer, /WIPE = \[[^\]]*"class_seat_allocation_changes"/)
 })
