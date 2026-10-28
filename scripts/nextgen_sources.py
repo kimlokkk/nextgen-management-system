@@ -31,6 +31,8 @@ def _is_black(cell):
     return bool(f is not None and f.fill_type is not None and f.fgColor is not None
                 and f.fgColor.type == "rgb" and f.fgColor.rgb == "FF000000")
 
+DIRECTORY_HEADERS = {"NAMA PELAJAR", "NAMA STUDENT", "NAMA MURID", "STUDENT NAME"}
+
 def parse_directory(wb):
     """students-parents workbook -> {'MTDC': [row,...], 'CYBER': [...]} (row: name, phone, parent, sheet_row)."""
     out = {}
@@ -38,7 +40,8 @@ def parse_directory(wb):
         b = branch_of(ws.title)
         if not b: continue
         out[b] = [dict(name=clean(ws.cell(r, 2).value), phone=clean(ws.cell(r, 3).value), parent=clean(ws.cell(r, 4).value), row=r)
-                  for r in range(2, ws.max_row + 1) if looks_like_name(ws.cell(r, 2).value)]
+                  for r in range(1, ws.max_row + 1)
+                  if looks_like_name(ws.cell(r, 2).value) and up(ws.cell(r, 2).value) not in DIRECTORY_HEADERS]
     return out
 
 def parse_roster(wb, source):

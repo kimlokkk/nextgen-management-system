@@ -23,6 +23,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Test directory import (phones, headers, shared parents; synthetic only)
+        run: python3 -m unittest tests/test_directory_import.py
       - name: Check full Supabase archive restore guard
         run: python3 -m unittest discover -s tests -p test_restore_archive.py
       - name: Verify read-only recovery preflight script syntax

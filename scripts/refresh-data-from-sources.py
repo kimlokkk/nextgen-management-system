@@ -54,7 +54,20 @@ def row_flags(r):
     if rem and REVIEW_TOKENS.search(rem) and not stop: n.append(("REMARK_REVIEW", "Sheet remark mentions a change or leave; admin to review"))
     return dict(status=status, freq=freq, weeks=weeks, notices=n)
 
-def clean_phone(s): return digits(s)
+PHONE_SPLIT = re.compile(r"[/;,|]|\(|\)|\bDAFTAR\b|\bWS\b|\bATAU\b", re.I)
+
+def phone_numbers(s):
+    """Every real number in a sheet cell, digits only, in order. Cells like '012-3450001/ 0 13-450 0002' or
+    '0 17-450 0003 (DAFTAR WS) / 0194500004' hold several numbers; gluing all digits together makes a wrong phone."""
+    found = [digits(seg) for seg in PHONE_SPLIT.split(str(s or "")) if len(digits(seg)) >= 9]
+    if found: return found
+    whole = digits(s)
+    return [whole] if whole else []
+
+def clean_phone(s):
+    """The first number in the cell (the one the admin wrote first)."""
+    nums = phone_numbers(s)
+    return nums[0] if nums else ""
 
 EVIDENCE_REF = "Client sheet colour code (red = absent, black = official NextGen closure), confirmed with the admin on 2026-10-27"
 SEPT_CSV = ROOT / "private/NextGen_MTDC_September2026_PRIVATE_Evidence.csv"
@@ -204,6 +217,8 @@ def attach_parent(parents, guardians, st, d, rs, plan):
     if not phone:
         phone = next((digits(r["contact"]) for r in rs if digits(r["contact"])), "")
         if phone: pnote = "Phone taken from the October roster (directory phone empty)"
+    others = phone_numbers(d["phone"])[1:]
+    if others: pnote = ((pnote + "; ") if pnote else "") + "Other number in directory: " + ", ".join(others)
     key = (S.name_key(pname), S.phone_key(phone) if phone else f"nophone-{st['id']}")
     p = parents.get(key)
     if not p:

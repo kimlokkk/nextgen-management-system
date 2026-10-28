@@ -82,3 +82,10 @@ No migrations or data writes are added by this audit screen.
 - 029: admins can edit a DRAFT month: `move_student_in_draft`, `add_student_to_draft_class`, `remove_student_from_draft_class` (same programme; capacity, overlap and enrollment-window checks; reason required; one row each in `draft_schedule_edits`; enrollments are never changed) and `reopen_schedule_draft` (approved, not locked, back to draft). Hand-placed bookings are flagged `manually_placed`.
 - Data refresh importer (`scripts/refresh-data-from-sources.py`): rebuilds local business data from the sheets. It only targets the local Native Runtime database and `apply --target main` requires a fresh backup snapshot. Its per-student notices and make-up review lists are written to `private/*.csv` (git-ignored) and are NOT yet shown inside the app.
 - The 2026-10-28 audit confirms all 29 migrations are applied and the audit expects 22 public tables.
+
+## Refreshing parents and guardians from the updated directory sheet
+- The directory sheet (tabs CYBER and MTDC; column B student, C phone, D parent) is the guardian source for the data-refresh importer. To use a newer version, export the Google Sheet as .xlsx into `private/sources/students-parents.xlsx` (git-ignored). The importer needs no new format.
+- A cell with several numbers (for example `012-3450001/ 0 13-450 0002`, or two numbers with a `(DAFTAR WS)` label between them) now gives the FIRST number as the parent phone and keeps the other number in the parent note. Before, all digits were glued into one wrong phone.
+- Header rows are never read as students. Siblings with the same parent and phone still share one parent record.
+- On 2026-10-28 the 37 students without a guardian were linked in the LOCAL database straight from this sheet through the audited guardian RPCs (relationship `guardian`, because the sheet only says father or mother). A later refresh rebuilds guardians from the sheet, so the sheet must contain those parents before the importer is run.
+- Covered by `tests/test_directory_import.py` (synthetic data only). The importer itself was not run for this change.
