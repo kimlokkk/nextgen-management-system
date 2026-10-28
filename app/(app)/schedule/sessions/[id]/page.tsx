@@ -6,6 +6,7 @@ import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { markForReschedule, initiateReplacement, recordAttendance } from "./actions"
 import { decideClassReplacementCapacity } from "./capacity-actions"
+import { reallocateClassSeats } from "./seat-actions"
 import { addStudentToDraft, moveStudentInDraft, removeStudentFromDraft } from "./edit-actions"
 import { getYellowSeatUsage } from "@/lib/yellow-seat-usage"
 import { FormSubmit } from "@/components/form-submit"
@@ -176,6 +177,13 @@ export default async function ScheduleSessionPage({
             .order("student_name")
         : { data: [], error: null }
     const legacyReservations = legacyData ?? []
+    const { data: seatChanges } = canReadLegacy
+        ? await supabase.from("class_seat_allocation_changes")
+            .select("id, old_regular, old_replacement, new_regular, new_replacement, reason, source_ref, changed_at")
+            .eq("class_session_id", session.id)
+            .order("changed_at", { ascending: false })
+            .limit(5)
+        : { data: [] }
     const yellowUsage = getYellowSeatUsage(
         session.id,
         session.replacement_capacity,
@@ -708,6 +716,64 @@ export default async function ScheduleSessionPage({
                     Legacy seats are reserved; attendance remains unrecorded.
                 </p>
             )}
+
+            {canReadLegacy && session.status === "scheduled" && (() => {
+                const total = session.regular_capacity + session.replacement_capacity
+                const regularBooked = regularBookings.length
+                const replacementReserved = yellowUsage.occupied
+                const minRegular = regularBooked
+                const maxRegular = total - replacementReserved
+                const needsSource = batch?.status !== "draft"
+                return (
+                    <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Change seats in this class">
+                        <h2 className="font-semibold">Change seats · this class only</h2>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                            This class has {total} seats: {session.regular_capacity} regular and {session.replacement_capacity} replacement.
+                            You can move seats from one kind to the other. The total stays {total}, and nobody is moved or removed.
+                            Regular cannot go below {minRegular} (already booked) and replacement cannot go below {replacementReserved} (already reserved).
+                        </p>
+                        {minRegular >= maxRegular ? (
+                            <p className="mt-3 text-sm text-muted-foreground">No seats can be moved: every seat is already in use.</p>
+                        ) : (
+                            <form action={reallocateClassSeats} className="mt-4 space-y-3">
+                                <input type="hidden" name="session_id" value={session.id} />
+                                <input type="hidden" name="expected_regular" value={session.regular_capacity} />
+                                <input type="hidden" name="expected_replacement" value={session.replacement_capacity} />
+                                <label className="block text-sm font-medium">
+                                    Regular seats after the change (replacement becomes the rest)
+                                    <input name="new_regular" type="number" required min={minRegular} max={maxRegular}
+                                        defaultValue={session.regular_capacity}
+                                        className="mt-1 h-10 w-full rounded-lg border bg-background px-3 text-sm sm:w-40" />
+                                </label>
+                                <label className="block text-sm font-medium">
+                                    {needsSource ? "Where is this from? (required)" : "Where is this from? (optional)"}
+                                    <input name="source_ref" required={needsSource} minLength={3} maxLength={200}
+                                        placeholder="For example: MTDC October sheet, Saturday 11:00"
+                                        className="mt-1 h-10 w-full rounded-lg border bg-background px-3 text-sm" />
+                                </label>
+                                <label className="block text-sm font-medium">
+                                    Reason
+                                    <input name="reason" required minLength={10} maxLength={500}
+                                        placeholder="At least 10 characters. Do not write student names."
+                                        className="mt-1 h-10 w-full rounded-lg border bg-background px-3 text-sm" />
+                                </label>
+                                <FormSubmit>Save seat change</FormSubmit>
+                            </form>
+                        )}
+                        {(seatChanges ?? []).length > 0 && (
+                            <ul className="mt-4 space-y-2 border-t pt-3 text-sm text-muted-foreground">
+                                {(seatChanges ?? []).map((change) => (
+                                    <li key={change.id}>
+                                        {change.old_regular}+{change.old_replacement} → {change.new_regular}+{change.new_replacement}
+                                        {" · "}{new Date(change.changed_at).toLocaleDateString("en-MY")}
+                                        {" · "}{change.reason}{change.source_ref ? ` (${change.source_ref})` : ""}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+                )
+            })()}
 
             {canAdjustDraftCapacity && (
                 <section className="rounded-xl border bg-card p-4 sm:p-5" aria-label="Review single-class replacement capacity">
